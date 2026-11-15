@@ -1,0 +1,1709 @@
+/*
+ * Infinite Scroll Gallery for Elementor
+ * Based on "Infinite Scroll Gallery and Flip Transitions in GSAP" (Codrops / Surya Aditya, MIT)
+ *
+ * All visual options are CSS custom properties so Elementor controls can override them.
+ *
+ * THEME COMPATIBILITY NOTE
+ * Every rule is scoped under ".ifg" (specificity 0,2,0 or higher) on purpose.
+ * Elementor's Site Settings (Kit) and most themes style bare elements such as
+ * button / img / figure / figcaption / h2 / h3 / p / a with selectors like
+ * ".elementor-kit-5 h2" or ".entry-content img". A single-class selector loses
+ * against those, so the widget would inherit foreign colours, sizes, paddings
+ * and button looks. Do not flatten these selectors.
+ */
+
+.ifg,
+.ifg *,
+.ifg *::before,
+.ifg *::after {
+  box-sizing: border-box;
+}
+
+.ifg {
+  --ifg-bg: #eaeeed;
+  --ifg-caption-color: #9b9b9b;
+  --ifg-frame-color: #9b9b9b;
+  --ifg-title-color: #141414;
+  --ifg-desc-color: #9b9b9b;
+  --ifg-back-color: #111111;
+  --ifg-height: 100vh;
+  --ifg-gap: 12vh;
+  --ifg-pad-top: 14vh;
+  --ifg-page-padding: 18px;
+  --ifg-ratio: 0.8;
+  --ifg-width-scale: 1;
+  --ifg-device-scale: 1;
+  --ifg-stagger-scale: 1;
+  --ifg-radius: 0px;
+  --ifg-img-scale: 1.2;
+  --ifg-hover-scale: 1.2;
+  --ifg-caption-size: 12px;
+  --ifg-title-size: 72px;
+  --ifg-desc-size: 18px;
+  --ifg-z: 1000;
+  /* Horizontal unit for the staggered layout: viewport width, or the widget width when supported */
+  --ifg-u: 1vw;
+
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: var(--ifg-height);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  /* "clip" cannot be scrolled programmatically: tabbing to / focusing an off-screen slide would otherwise
+     scroll this box and push the whole layout out of place */
+  overflow: clip;
+  isolation: isolate;
+  background-color: var(--ifg-bg);
+  color: var(--ifg-caption-color);
+  font-size: 12px;
+  line-height: normal;
+  text-align: start;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@supports (width: 1cqw) {
+  .ifg {
+    --ifg-u: 1cqw;
+  }
+}
+
+.ifg.ifg--no-touch {
+  touch-action: pan-y;
+}
+
+/* Elementor widget wrapper: never let a flex parent shrink the gallery to its content */
+.elementor-widget.elementor-widget-ifg_gallery {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.elementor-widget-ifg_gallery > .elementor-widget-container {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Hide everything until the script finished measuring (prevents a flash) */
+/* (only while the script is running: without JS the plain grid fallback below must stay visible) */
+.ifg.ifg--js:not(.ifg--ready) .ifg__img,
+.ifg.ifg--js:not(.ifg--ready) .ifg__caption {
+  visibility: hidden;
+}
+
+/* Loader */
+.ifg .ifg__loader {
+  position: absolute;
+  inset: 0;
+  z-index: 10000;
+  background: var(--ifg-bg);
+}
+
+.ifg .ifg__loader::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100px;
+  height: 1px;
+  margin: 0 0 0 -50px;
+  background: var(--ifg-caption-color);
+  animation: ifg-loader 1.5s ease-in-out infinite alternate forwards;
+}
+
+@keyframes ifg-loader {
+  0% {
+    transform: scaleX(0);
+    transform-origin: 0% 50%;
+  }
+  50% {
+    transform: scaleX(1);
+    transform-origin: 0% 50%;
+  }
+  50.1% {
+    transform: scaleX(1);
+    transform-origin: 100% 50%;
+  }
+  100% {
+    transform: scaleX(0);
+    transform-origin: 100% 50%;
+  }
+}
+
+/* Frame (title / links / tags) */
+.ifg .ifg__frame {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 0;
+  padding: var(--ifg-page-padding);
+  pointer-events: none;
+  color: var(--ifg-frame-color);
+}
+
+.ifg .ifg__frame-top,
+.ifg .ifg__frame-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+.ifg .ifg__frame-title {
+  margin: 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+  color: inherit;
+}
+
+.ifg .ifg__frame-links,
+.ifg .ifg__frame-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+}
+
+.ifg .ifg__frame a {
+  pointer-events: auto;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  text-decoration: none;
+}
+
+.ifg .ifg__frame a:hover,
+.ifg .ifg__frame a:focus {
+  background: none;
+  text-decoration: underline;
+  color: var(--ifg-back-color);
+}
+
+/* Gallery */
+.ifg .ifg__gallery {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ifg-gap);
+  width: 100%;
+  margin: 0;
+  padding: var(--ifg-pad-top) 0 0;
+  /* lets the slides use container units (cqw) for their horizontal stagger */
+  container-type: inline-size;
+}
+
+.ifg .ifg__slide {
+  position: relative;
+  flex-shrink: 0;
+  /* The original demo never resets the browser's default <figure> margin, so every slide carries 1em (12px) of
+     extra space above and below. It is part of the demo's vertical rhythm and parallax maths, so it is kept. */
+  margin: 12px 0;
+  padding: 0;
+  /* The stagger uses "left" (not transform) so GSAP can own the transform and the
+     offset stays live when the widget is resized or edited in Elementor. */
+  left: calc(var(--stagger, 0) * var(--ifg-u) * var(--ifg-stagger-scale));
+  cursor: pointer;
+  outline: none;
+  will-change: transform;
+}
+
+.ifg .ifg__slide:focus-visible .ifg__img {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+.ifg.ifg--click-none .ifg__slide {
+  cursor: default;
+}
+
+/* Staggered layout pattern, taken 1:1 from the original Codrops demo (repeats every 24 slides).
+   Both values are unitless: 1 unit = 1% of the widget width (1vw in the original, where the widget is the whole page). */
+.ifg .ifg__slide:nth-child(24n + 1) { --stagger: -24; --img-w: 20; }
+.ifg .ifg__slide:nth-child(24n + 2) { --stagger: 14; --img-w: 10; }
+.ifg .ifg__slide:nth-child(24n + 3) { --stagger: -18; --img-w: 23; }
+.ifg .ifg__slide:nth-child(24n + 4) { --stagger: 22; --img-w: 18; }
+.ifg .ifg__slide:nth-child(24n + 5) { --stagger: -26; --img-w: 25; }
+.ifg .ifg__slide:nth-child(24n + 6) { --stagger: 28; --img-w: 28; }
+.ifg .ifg__slide:nth-child(24n + 7) { --stagger: -20; --img-w: 16; }
+.ifg .ifg__slide:nth-child(24n + 8) { --stagger: 8; --img-w: 30; }
+.ifg .ifg__slide:nth-child(24n + 9) { --stagger: -12; --img-w: 15; }
+.ifg .ifg__slide:nth-child(24n + 10) { --stagger: 15; --img-w: 23; }
+.ifg .ifg__slide:nth-child(24n + 11) { --stagger: -24; --img-w: 24; }
+.ifg .ifg__slide:nth-child(24n + 12) { --stagger: 26; --img-w: 16; }
+.ifg .ifg__slide:nth-child(24n + 13) { --stagger: -16; --img-w: 34; }
+.ifg .ifg__slide:nth-child(24n + 14) { --stagger: 24; --img-w: 13; }
+.ifg .ifg__slide:nth-child(24n + 15) { --stagger: -28; --img-w: 19; }
+.ifg .ifg__slide:nth-child(24n + 16) { --stagger: 18; --img-w: 22; }
+.ifg .ifg__slide:nth-child(24n + 17) { --stagger: -10; --img-w: 27; }
+.ifg .ifg__slide:nth-child(24n + 18) { --stagger: 20; --img-w: 18; }
+.ifg .ifg__slide:nth-child(24n + 19) { --stagger: -22; --img-w: 19; }
+.ifg .ifg__slide:nth-child(24n + 20) { --stagger: 16; --img-w: 30; }
+.ifg .ifg__slide:nth-child(24n + 21) { --stagger: -18; --img-w: 17; }
+.ifg .ifg__slide:nth-child(24n + 22) { --stagger: 24; --img-w: 12; }
+.ifg .ifg__slide:nth-child(24n + 23) { --stagger: -26; --img-w: 23; }
+.ifg .ifg__slide:nth-child(24n + 24) { --stagger: 12; --img-w: 26; }
+
+.ifg .ifg__caption {
+  display: block;
+  /* width:0 + min-width:100% keeps a long caption inside the image width (it wraps instead of widening the slide) */
+  width: 0;
+  min-width: 100%;
+  margin: 0.5em 0 0;
+  padding: 0;
+  color: var(--ifg-caption-color);
+  font-size: var(--ifg-caption-size);
+  font-style: normal;
+  font-weight: 400;
+  /* "normal" like the original demo: the caption height feeds the slide spacing and the parallax maths */
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: start;
+  text-transform: none;
+}
+
+.ifg .ifg__img {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  /* --img-px: optional per-slide width in px (set from the slide's "Custom thumbnail width"); otherwise % of widget width */
+  width: calc(var(--img-px, calc(var(--img-w, 20) * var(--ifg-u))) * var(--ifg-width-scale) * var(--ifg-device-scale));
+  height: auto;
+  aspect-ratio: var(--ifg-ratio);
+  overflow: hidden;
+  border-radius: var(--ifg-radius);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@supports (width: 1cqw) {
+  .ifg .ifg__img {
+    width: min(calc(var(--img-px, calc(var(--img-w, 20) * var(--ifg-u))) * var(--ifg-width-scale) * var(--ifg-device-scale)), 80cqw);
+  }
+}
+
+.ifg .ifg__img img,
+.ifg .ifg__preview img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  object-fit: var(--ifg-img-fit, cover);
+  object-position: var(--ifg-img-pos, 50% 50%);
+  transform: scale(var(--ifg-img-scale));
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: 1;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), filter 0.6s ease;
+  -webkit-user-drag: none;
+}
+
+@media (hover: hover) {
+  .ifg .ifg__slide:hover .ifg__img img {
+    transform: scale(var(--ifg-hover-scale));
+  }
+}
+
+/* Content overlay */
+.ifg .ifg__content {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: var(--ifg-z);
+  container-type: size;
+  background: var(--ifg-overlay-bg, transparent);
+}
+
+.ifg.ifg--overlay-fixed .ifg__content {
+  position: fixed;
+  background: transparent;
+}
+
+/* Fullscreen overlay needs its own backdrop, otherwise the page shows through.
+   Its opacity is animated through --ifg-fade by the script. */
+.ifg.ifg--overlay-fixed .ifg__content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ifg-overlay-bg, var(--ifg-bg));
+  opacity: var(--ifg-fade, 1);
+}
+
+.ifg .ifg__img,
+.ifg .ifg__preview {
+  background-color: var(--ifg-img-bg, transparent);
+}
+
+.ifg .ifg__preview {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  top: 0;
+  left: 0;
+  height: 100%;
+  aspect-ratio: var(--ifg-ratio);
+  overflow: hidden;
+  border-radius: var(--ifg-radius);
+}
+
+/* Overridden while Flip is running (Flip writes inline sizes) */
+.ifg .ifg__preview img {
+  transition: none;
+}
+
+.ifg .ifg__groups {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  padding-block: var(--ifg-page-padding);
+  padding-inline-start: var(--ifg-page-padding);
+  padding-inline-end: var(--ifg-page-padding);
+  padding-left: calc(var(--ifg-height) * var(--ifg-ratio) + 1.5vw);
+  padding-left: calc(100cqh * var(--ifg-ratio) + 1.5cqw);
+  padding-right: var(--ifg-page-padding);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ifg .ifg__groups::-webkit-scrollbar {
+  display: none;
+}
+
+/* Back button — must survive theme / Elementor Kit button styles (background, border, padding, hover colours) */
+.ifg .ifg__back,
+.ifg .ifg__back:hover,
+.ifg .ifg__back:focus,
+.ifg .ifg__back:active {
+  align-self: flex-start;
+  display: inline-block;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  color: var(--ifg-back-color);
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  text-align: start;
+  text-transform: none;
+  white-space: normal;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: none;
+}
+
+.ifg .ifg__back:hover {
+  text-decoration: underline;
+}
+
+.ifg .ifg__back:focus-visible {
+  outline: 1px dashed currentColor;
+  outline-offset: 4px;
+}
+
+.ifg .ifg__group {
+  display: none;
+}
+
+.ifg .ifg__group.active {
+  display: block;
+}
+
+.ifg .ifg__count {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 40cqh 0 0 auto;
+  padding: 0;
+  color: var(--ifg-caption-color);
+  font-size: var(--ifg-caption-size);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.ifg .ifg__title {
+  display: block;
+  /* Like the original demo (justify-self: end): the title and text sit against the end edge of the text column */
+  width: fit-content;
+  max-width: 100%;
+  margin: 40cqh 0 0.5em auto;
+  padding: 0;
+  font-family: var(--ifg-title-font, inherit);
+  font-weight: 400;
+  font-style: normal;
+  font-size: clamp(30px, 10vw, var(--ifg-title-size));
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: start;
+  color: var(--ifg-title-color);
+}
+
+.ifg .ifg__count + .ifg__title {
+  margin-top: 0.3em;
+}
+
+/* Mixed-language sites: the markup gives every text block dir="auto", so an English label on a Persian page
+   (or the reverse) takes its direction from its own content. */
+
+/* The text animation wraps words / letters in inline-blocks, which do not inherit an underline */
+.ifg .ifg__back *,
+.ifg .ifg__cta *,
+.ifg .ifg__frame a * {
+  text-decoration: inherit;
+  text-underline-offset: inherit;
+}
+
+.ifg .ifg__desc {
+  width: fit-content;
+  margin: 0 10vw 0 auto;
+  padding: 0;
+  max-width: min(50ch, 100%);
+  font-size: clamp(12px, 2.5vw, var(--ifg-desc-size));
+  /* "normal" like the original demo (change it in Style > Typography > Content Description) */
+  line-height: normal;
+  text-align: start;
+  color: var(--ifg-desc-color);
+}
+
+.ifg .ifg__cta {
+  display: block;
+  width: fit-content;
+  margin: 2em 10vw 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--ifg-back-color);
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+.ifg .ifg__cta:hover,
+.ifg .ifg__cta:focus {
+  background: none;
+  color: var(--ifg-back-color);
+  text-decoration: underline;
+  opacity: 0.7;
+}
+
+/* ------------------------------------------------------------------ */
+/* Right-to-left (Persian / Arabic / Hebrew): mirror the content view  */
+/* The class is added by PHP (is_rtl) and by the script as a fallback. */
+/* ------------------------------------------------------------------ */
+.ifg.ifg--rtl .ifg__preview {
+  left: auto;
+  right: 0;
+}
+
+.ifg.ifg--rtl .ifg__groups {
+  padding-left: var(--ifg-page-padding);
+  padding-right: calc(var(--ifg-height) * var(--ifg-ratio) + 1.5vw);
+  padding-right: calc(100cqh * var(--ifg-ratio) + 1.5cqw);
+}
+
+.ifg.ifg--rtl .ifg__count {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.ifg.ifg--rtl .ifg__title {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.ifg.ifg--rtl .ifg__desc {
+  margin-left: 10vw;
+  margin-right: auto;
+}
+
+.ifg.ifg--rtl .ifg__cta {
+  margin-left: 10vw;
+  margin-right: auto;
+}
+
+/* Small screens: image on top, text below */
+@media (max-width: 767px) {
+  .ifg .ifg__preview,
+  .ifg.ifg--rtl .ifg__preview {
+    left: 0;
+    right: auto;
+    width: 100%;
+    height: 44%;
+    aspect-ratio: auto;
+  }
+
+  .ifg .ifg__groups,
+  .ifg.ifg--rtl .ifg__groups {
+    padding-left: var(--ifg-page-padding);
+    padding-right: var(--ifg-page-padding);
+    padding-top: calc(44cqh + var(--ifg-page-padding));
+  }
+
+  .ifg .ifg__back,
+  .ifg .ifg__back:hover,
+  .ifg .ifg__back:focus {
+    position: absolute;
+    top: var(--ifg-page-padding);
+    inset-inline-start: var(--ifg-page-padding);
+    z-index: 2;
+    color: #fff;
+    mix-blend-mode: difference;
+  }
+
+  .ifg .ifg__title,
+  .ifg .ifg__count {
+    margin-top: 0;
+  }
+
+  .ifg .ifg__count + .ifg__title {
+    margin-top: 0.3em;
+  }
+
+  .ifg .ifg__title {
+    font-size: clamp(28px, 9vw, var(--ifg-title-size));
+  }
+
+  .ifg .ifg__title,
+  .ifg .ifg__count,
+  .ifg .ifg__desc,
+  .ifg .ifg__cta,
+  .ifg.ifg--rtl .ifg__title,
+  .ifg.ifg--rtl .ifg__count,
+  .ifg.ifg--rtl .ifg__desc,
+  .ifg.ifg--rtl .ifg__cta {
+    width: auto;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .ifg .ifg__cta,
+  .ifg.ifg--rtl .ifg__cta {
+    width: fit-content;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ifg .ifg__img img {
+    transition: none;
+  }
+}
+
+/* Forced layout direction (Layout > Layout Direction): text alignment follows it, whatever the text language */
+.ifg.ifg--dir-ltr .ifg__caption,
+.ifg.ifg--dir-ltr .ifg__count,
+.ifg.ifg--dir-ltr .ifg__title,
+.ifg.ifg--dir-ltr .ifg__desc,
+.ifg.ifg--dir-ltr .ifg__cta {
+  text-align: left;
+}
+
+.ifg.ifg--dir-rtl .ifg__caption,
+.ifg.ifg--dir-rtl .ifg__count,
+.ifg.ifg--dir-rtl .ifg__title,
+.ifg.ifg--dir-rtl .ifg__desc,
+.ifg.ifg--dir-rtl .ifg__cta {
+  text-align: right;
+}
+
+/* Full screen width: as wide as the browser window even inside a boxed container */
+.ifg.ifg--bleed {
+  width: 100vw;
+  max-width: 100vw;
+  left: 50%;
+  margin-left: -50vw;
+}
+
+/* "Cover the entire page": the gallery fills the browser window, exactly like the original demo */
+.ifg.ifg--page {
+  position: fixed;
+  inset: 0;
+  left: 0;
+  margin: 0;
+  z-index: var(--ifg-page-z, 9990);
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+}
+
+html.ifg-page-lock,
+html.ifg-page-lock body {
+  overflow: hidden !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Real slide links, price, scroll hint                                */
+/* ------------------------------------------------------------------ */
+.ifg .ifg-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Invisible link laid over the whole slide: crawlers, middle-click and "copy link" work, a plain click opens the content view */
+.ifg .ifg__slidelink {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  text-decoration: none;
+  outline: none;
+  -webkit-user-drag: none;
+}
+
+.ifg .ifg__slide:has(.ifg__slidelink:focus-visible) .ifg__img {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+
+.ifg .ifg__price {
+  margin: 0 10vw 1em auto;
+  width: fit-content;
+  max-width: min(50ch, 100%);
+  font-size: var(--ifg-caption-size);
+  line-height: normal;
+  text-align: start;
+  color: var(--ifg-title-color);
+}
+
+.ifg.ifg--rtl .ifg__price {
+  margin: 0 auto 1em 10vw;
+}
+
+.ifg .ifg__price del {
+  opacity: 0.55;
+}
+
+.ifg .ifg__price ins {
+  background: none;
+  text-decoration: none;
+}
+
+.ifg .ifg__stock {
+  margin-inline-start: 0.6em;
+  color: var(--ifg-caption-color);
+}
+
+@media (max-width: 767px) {
+  .ifg .ifg__price,
+  .ifg.ifg--rtl .ifg__price {
+    margin: 0 0 1em;
+  }
+}
+
+/* "After click" scroll mode: the page keeps scrolling by touch until the gallery is engaged */
+.ifg.ifg--scroll-click:not(.ifg--engaged) {
+  touch-action: pan-y;
+}
+
+.ifg .ifg__hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--ifg-page-padding) + 2.2em);
+  z-index: 90;
+  transform: translateX(-50%);
+  padding: 0.5em 1em;
+  border-radius: 99px;
+  background: var(--ifg-title-color);
+  color: var(--ifg-bg);
+  font-size: var(--ifg-caption-size);
+  line-height: normal;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.ifg.ifg--ready.ifg--scroll-click:not(.ifg--engaged) .ifg__hint {
+  opacity: 0.85;
+}
+/* ================================================================== */
+/* v1.6 — Video slides                                                 */
+/* ================================================================== */
+
+/* Play badge on a video thumbnail (the real player is only mounted once the content view is open) */
+.ifg .ifg__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: 3.4em;
+  height: 3.4em;
+  margin: -1.7em 0 0 -1.7em;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+}
+
+.ifg .ifg__play::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -0.6em 0 0 -0.3em;
+  border-style: solid;
+  border-width: 0.6em 0 0.6em 1em;
+  border-color: transparent transparent transparent #fff;
+}
+
+@media (hover: hover) {
+  .ifg .ifg__slide:hover .ifg__play {
+    transform: scale(1.12);
+    background: rgba(0, 0, 0, 0.75);
+  }
+}
+
+/* Player layer, appended to .ifg__preview AFTER the Flip animation has finished */
+.ifg .ifg__video {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: inherit;
+  background: #000;
+  pointer-events: auto;
+}
+
+.ifg .ifg__video video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  background: #000;
+  object-fit: contain;
+  transform: none;
+}
+
+.ifg .ifg__video--cover video {
+  object-fit: cover;
+}
+
+/* iframes cannot "object-fit": "contain" letterboxes a 16:9 frame in the middle ... */
+.ifg .ifg__video iframe {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  aspect-ratio: 16 / 9;
+  transform: translateY(-50%);
+}
+
+/* ... and "cover" is sized by the script (it needs both box dimensions) */
+.ifg .ifg__video--cover iframe {
+  left: 50%;
+  aspect-ratio: auto;
+  transform: translate(-50%, -50%);
+}
+
+.ifg .ifg__video:focus-within {
+  outline: 2px solid var(--ifg-back-color);
+  outline-offset: -2px;
+}
+
+/* ================================================================== */
+/* v1.6 — WooCommerce: price + add to cart                             */
+/* ================================================================== */
+
+.ifg .ifg__buy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75em 1.25em;
+  width: fit-content;
+  max-width: min(50ch, 100%);
+  margin: 0 10vw 1.25em auto;
+  padding: 0;
+}
+
+.ifg.ifg--rtl .ifg__buy {
+  margin: 0 auto 1.25em 10vw;
+}
+
+.ifg .ifg__buy .ifg__price,
+.ifg.ifg--rtl .ifg__buy .ifg__price {
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+
+/* Button — must survive theme / Elementor Kit button styles, exactly like .ifg__back */
+.ifg .ifg__atc,
+.ifg .ifg__atc:hover,
+.ifg .ifg__atc:focus,
+.ifg .ifg__atc:active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 2.75em; /* comfortable touch target (WCAG 2.5.8) */
+  margin: 0 !important;
+  padding: 0.7em 1.6em !important;
+  border: 1px solid var(--ifg-atc-bg, var(--ifg-title-color)) !important;
+  border-radius: var(--ifg-atc-radius, 99px) !important;
+  background: var(--ifg-atc-bg, var(--ifg-title-color)) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  color: var(--ifg-atc-color, var(--ifg-bg)) !important;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: normal;
+  text-align: center;
+  text-decoration: none;
+  text-transform: none;
+  white-space: normal;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background-color 0.25s ease, color 0.25s ease, opacity 0.25s ease;
+}
+
+.ifg .ifg__atc:hover,
+.ifg .ifg__atc:focus-visible {
+  background: var(--ifg-atc-bg-hover, transparent) !important;
+  color: var(--ifg-atc-color-hover, var(--ifg-title-color)) !important;
+}
+
+.ifg .ifg__atc:focus-visible {
+  outline: 2px solid var(--ifg-title-color);
+  outline-offset: 3px;
+}
+
+/* aria-disabled (not [disabled]) while the request runs: the button keeps keyboard focus */
+.ifg .ifg__atc[aria-busy="true"] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.ifg .ifg__atc.is-added::before {
+  content: "\2713";
+  font-weight: 700;
+}
+
+.ifg .ifg__atc.is-error {
+  border-color: #b3261e !important;
+}
+
+.ifg .ifg__viewcart {
+  color: var(--ifg-back-color);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+.ifg .ifg__viewcart[hidden] {
+  display: none;
+}
+
+.ifg .ifg__viewcart:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* WooCommerce's own add-to-cart script injects its "View cart" link after a successful AJAX add; we show our own */
+.ifg .added_to_cart {
+  display: none !important;
+}
+
+@media (max-width: 767px) {
+  .ifg .ifg__buy,
+  .ifg.ifg--rtl .ifg__buy {
+    margin: 0 0 1.25em;
+    justify-content: flex-start;
+  }
+}
+
+/* ================================================================== */
+/* v1.6 — Category filter bar                                          */
+/* ================================================================== */
+
+.ifg .ifg__filters {
+  position: absolute;
+  top: calc(var(--ifg-filter-top, var(--ifg-page-padding)) + 2.6em);
+  right: var(--ifg-page-padding);
+  left: var(--ifg-page-padding);
+  /* above the loader (10000) so the bar stays usable while a category loads */
+  z-index: 10010;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.ifg .ifg__filter-list {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5em;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.25em;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  pointer-events: auto;
+  /* the widget itself is touch-action:none; the bar is its own scroll container and may pan sideways */
+  touch-action: pan-x;
+}
+
+.ifg .ifg__filter-list::-webkit-scrollbar {
+  display: none;
+}
+
+.ifg .ifg__filter-list li {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ifg .ifg__filter,
+.ifg .ifg__filter:hover,
+.ifg .ifg__filter:focus,
+.ifg .ifg__filter:active {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.4em;
+  margin: 0;
+  padding: 0.45em 1.15em;
+  border: 1px solid var(--ifg-filter-border, rgba(127, 127, 127, 0.4));
+  border-radius: 99px;
+  background: var(--ifg-filter-bg, var(--ifg-bg));
+  box-shadow: none;
+  color: var(--ifg-filter-color, var(--ifg-title-color));
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  text-transform: none;
+  cursor: pointer;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.ifg .ifg__filter:hover {
+  border-color: var(--ifg-filter-color, var(--ifg-title-color));
+}
+
+.ifg .ifg__filter.is-active,
+.ifg .ifg__filter.is-active:hover,
+.ifg .ifg__filter.is-active:focus,
+.ifg .ifg__filter[aria-pressed="true"] {
+  border-color: var(--ifg-filter-active-bg, var(--ifg-title-color));
+  background: var(--ifg-filter-active-bg, var(--ifg-title-color));
+  color: var(--ifg-filter-active-color, var(--ifg-bg));
+}
+
+.ifg .ifg__filter:focus-visible {
+  outline: 2px solid var(--ifg-title-color);
+  outline-offset: 2px;
+}
+
+/* A category request is running */
+.ifg.ifg--filtering .ifg__gallery {
+  cursor: progress;
+}
+
+.ifg .ifg__empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  width: min(90%, 40ch);
+  margin: 0;
+  transform: translate(-50%, -50%);
+  color: var(--ifg-caption-color);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ================================================================== */
+/* v1.6 — Accessibility                                                */
+/* ================================================================== */
+
+/* "Skip gallery" link: invisible until it receives keyboard focus */
+.ifg .ifg__skip {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 20000;
+  padding: 0.6em 1em;
+  background: var(--ifg-title-color);
+  color: var(--ifg-bg);
+  font-size: 13px;
+  text-decoration: none;
+  transform: translateY(-300%);
+}
+
+.ifg .ifg__skip:focus {
+  transform: none;
+  outline: 2px solid var(--ifg-bg);
+  outline-offset: -4px;
+}
+
+.ifg .ifg__end {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  outline: none;
+}
+
+/* Pause / resume for autoplay (WCAG 2.2.2) */
+.ifg .ifg__pause,
+.ifg .ifg__pause:hover,
+.ifg .ifg__pause:focus {
+  position: absolute;
+  inset-inline-end: var(--ifg-page-padding);
+  bottom: calc(var(--ifg-page-padding) + 2.4em);
+  z-index: 101;
+  margin: 0;
+  padding: 0.45em 1.1em;
+  border: 1px solid var(--ifg-filter-border, rgba(127, 127, 127, 0.4));
+  border-radius: 99px;
+  background: var(--ifg-filter-bg, var(--ifg-bg));
+  box-shadow: none;
+  color: var(--ifg-filter-color, var(--ifg-title-color));
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.ifg .ifg__pause[hidden] {
+  display: none;
+}
+
+.ifg .ifg__pause:focus-visible {
+  outline: 2px solid var(--ifg-title-color);
+  outline-offset: 2px;
+}
+
+/* While the content view is open everything behind it is inert (script) and hidden */
+.ifg.ifg--open .ifg__filters,
+.ifg.ifg--open .ifg__pause,
+.ifg.ifg--open .ifg__skip {
+  visibility: hidden;
+}
+
+/* Windows high-contrast / forced-colors: borders and focus must not vanish with the background colours */
+@media (forced-colors: active) {
+  .ifg .ifg__atc,
+  .ifg .ifg__filter,
+  .ifg .ifg__pause {
+    border: 1px solid ButtonText !important;
+  }
+  .ifg .ifg__filter.is-active,
+  .ifg .ifg__filter[aria-pressed="true"] {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ifg .ifg__play,
+  .ifg .ifg__atc,
+  .ifg .ifg__filter {
+    transition: none;
+  }
+}
+
+/* ================================================================== */
+/* v1.6 — No-JS / failed-JS fallback                                   */
+/*                                                                     */
+/* The widget markup carries class "ifg--js" only once JavaScript has   */
+/* started (a tiny inline snippet + ifg.js itself). Without it, the     */
+/* endless parallax column becomes a plain, responsive grid of cards:   */
+/* every image, caption, price, "add to cart" link and video link is    */
+/* reachable with a normal page scroll and no script at all.            */
+/* ================================================================== */
+
+.ifg .ifg__fallback {
+  display: none;
+}
+
+.ifg:not(.ifg--js) {
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  touch-action: auto;
+  user-select: auto;
+  -webkit-user-select: auto;
+}
+
+.ifg:not(.ifg--js).ifg--page,
+.ifg:not(.ifg--js).ifg--bleed {
+  position: relative;
+  height: auto;
+}
+
+.ifg:not(.ifg--js) .ifg__frame {
+  position: static;
+  pointer-events: auto;
+  padding-bottom: 0;
+}
+
+.ifg:not(.ifg--js) .ifg__frame-bottom {
+  margin-top: 0.75em;
+}
+
+.ifg:not(.ifg--js) .ifg__filters {
+  position: static;
+  justify-content: flex-start;
+  padding: var(--ifg-page-padding) var(--ifg-page-padding) 0;
+  pointer-events: auto;
+}
+
+.ifg:not(.ifg--js) .ifg__filter-list {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.ifg:not(.ifg--js) .ifg__gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  align-items: start;
+  gap: calc(var(--ifg-page-padding) * 1.5);
+  padding: calc(var(--ifg-page-padding) * 1.5) var(--ifg-page-padding);
+  container-type: normal;
+}
+
+.ifg:not(.ifg--js) .ifg__slide {
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  cursor: auto;
+  will-change: auto;
+}
+
+.ifg:not(.ifg--js) .ifg__img {
+  width: 100%;
+  pointer-events: auto;
+}
+
+.ifg:not(.ifg--js) .ifg__img img {
+  transform: none;
+}
+
+.ifg:not(.ifg--js) .ifg__caption {
+  width: auto;
+  min-width: 0;
+}
+
+/* The invisible overlay link only covers the picture, so the links in the text below stay clickable */
+.ifg:not(.ifg--js) .ifg__slidelink {
+  inset: 0 0 auto 0;
+  height: auto;
+  aspect-ratio: var(--ifg-ratio);
+}
+
+.ifg:not(.ifg--js) .ifg__fallback {
+  display: block;
+  margin-top: 0.6em;
+  color: var(--ifg-desc-color);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ifg:not(.ifg--js) .ifg__fb-price {
+  margin: 0 0 0.4em;
+  color: var(--ifg-title-color);
+}
+
+.ifg:not(.ifg--js) .ifg__fb-price del {
+  opacity: 0.55;
+}
+
+.ifg:not(.ifg--js) .ifg__fb-price ins {
+  background: none;
+  text-decoration: none;
+}
+
+.ifg:not(.ifg--js) .ifg__fb-desc {
+  margin: 0 0 0.6em;
+}
+
+.ifg:not(.ifg--js) .ifg__fb-link {
+  position: relative;
+  z-index: 4;
+  display: inline-block;
+  margin: 0 1em 0.4em 0;
+  color: var(--ifg-back-color);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.ifg:not(.ifg--js) .ifg__fb-atc {
+  padding: 0.45em 1.1em;
+  border: 1px solid var(--ifg-atc-bg, var(--ifg-title-color));
+  border-radius: var(--ifg-atc-radius, 99px);
+  background: var(--ifg-atc-bg, var(--ifg-title-color));
+  color: var(--ifg-atc-color, var(--ifg-bg));
+  text-decoration: none;
+}
+
+.ifg:not(.ifg--js) .ifg__fb-link:focus-visible {
+  outline: 2px solid var(--ifg-title-color);
+  outline-offset: 3px;
+}
+
+/* Things that only make sense with the script */
+.ifg:not(.ifg--js) .ifg__content,
+.ifg:not(.ifg--js) .ifg__hint,
+.ifg:not(.ifg--js) .ifg__pause {
+  display: none;
+}
+
+/* (the play badge stays: without the script a video thumbnail is a link to the video, and the badge says so) */
+
+/* Belt and braces for browsers that report scripting state in CSS */
+@media (scripting: none) {
+  .ifg .ifg__loader {
+    display: none;
+  }
+}
+
+/* ================================================================== */
+/* v1.6 — WooCommerce: rating + sale badge (content view)              */
+/* ================================================================== */
+
+.ifg .ifg__proof {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5em 1em;
+  width: fit-content;
+  max-width: min(50ch, 100%);
+  margin: 0 10vw 1em auto;
+  padding: 0;
+  font-size: var(--ifg-caption-size);
+  line-height: 1.4;
+  color: var(--ifg-caption-color);
+}
+
+.ifg.ifg--rtl .ifg__proof {
+  margin: 0 auto 1em 10vw;
+}
+
+.ifg .ifg__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.ifg .ifg__stars {
+  position: relative;
+  display: inline-block;
+  line-height: 1;
+  font-size: 1.05em;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.ifg .ifg__stars-off {
+  opacity: 0.3;
+}
+
+.ifg .ifg__stars-on {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--ifg-title-color);
+}
+
+.ifg .ifg__sale {
+  display: inline-block;
+  padding: 0.2em 0.75em;
+  border: 1px solid currentColor;
+  border-radius: 99px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--ifg-title-color);
+}
+
+@media (max-width: 767px) {
+  .ifg .ifg__proof,
+  .ifg.ifg--rtl .ifg__proof {
+    margin: 0 0 1em;
+    justify-content: flex-start;
+  }
+}
+
+
+
+
+اگه لینک براتون باز نشد، کد کامل رو همینجا می‌ذارم. کل متن رو کپی کن و توی فایلی به اسم `ifg-split-screen.css` ذخیره کن، یا مستقیم به آخر `assets/css/ifg.css` اضافه کن.
+
+```css
+/* ============================================================
+   Editorial Split-Screen: product overlay
+   ============================================================ */
+
+.ifg.ifg--page,
+.ifg.ifg--overlay-fixed {
+  --ifg-bg: #f0f0f0;
+  --ifg-overlay-bg: #f0f0f0;
+  --ifg-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ifg-ink: #111111;
+  --ifg-muted: #6b6b6b;
+  --ifg-line: #d6d6d6;
+  --ifg-title-font: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif;
+  background: #f0f0f0;
+}
+
+.ifg.ifg--page .ifg__content,
+.ifg.ifg--overlay-fixed .ifg__content {
+  background: #f0f0f0;
+}
+
+/* Image: fixed left column, full height */
+.ifg.ifg--page .ifg__preview,
+.ifg.ifg--rtl .ifg__preview {
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: auto;
+  width: 45%;
+  height: 100vh;
+  height: 100dvh;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.ifg.ifg--page .ifg__preview img,
+.ifg.ifg--rtl .ifg__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Text column: starts after the image, breathing room on the right */
+.ifg.ifg--page .ifg__groups,
+.ifg.ifg--rtl .ifg__groups {
+  padding-top: clamp(72px, 10vh, 128px);
+  padding-bottom: 6vh;
+  padding-left: 50%;
+  padding-right: 5vw;
+  background: #f0f0f0;
+}
+
+/* Back button: minimal, uppercase, top-left of the screen */
+.ifg.ifg--page .ifg__back,
+.ifg.ifg--page .ifg__back:hover,
+.ifg.ifg--page .ifg__back:focus,
+.ifg.ifg--page .ifg__back:active {
+  position: fixed;
+  inset-inline-start: auto;
+  inset-inline-end: auto;
+  top: 28px;
+  left: 28px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  align-self: auto;
+  width: auto;
+  margin: 0 !important;
+  padding: 10px 18px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(240, 240, 240, 0.85) !important;
+  box-shadow: none !important;
+  color: var(--ifg-ink) !important;
+  font-family: var(--ifg-title-font);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  mix-blend-mode: normal;
+  backdrop-filter: blur(8px);
+  transition: transform 0.4s var(--ifg-ease), background-color 0.4s var(--ifg-ease);
+}
+
+.ifg.ifg--page .ifg__back:hover {
+  background: #ffffff !important;
+  text-decoration: none;
+  transform: translateX(-3px);
+}
+
+.ifg.ifg--page .ifg__back:focus-visible {
+  outline: 1px solid var(--ifg-ink);
+  outline-offset: 4px;
+}
+
+/* Title: very large and bold */
+.ifg.ifg--page .ifg__title,
+.ifg.ifg--rtl .ifg__title {
+  margin: 0 0 0.45em auto;
+  font-family: var(--ifg-title-font);
+  font-weight: 800;
+  font-style: normal;
+  font-size: clamp(40px, 5vw, 80px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--ifg-ink);
+}
+
+/* Description: subtle gray */
+.ifg.ifg--page .ifg__desc,
+.ifg.ifg--rtl .ifg__desc {
+  margin: 0 0 2.5em auto;
+  max-width: 44ch;
+  font-family: var(--ifg-title-font);
+  font-size: clamp(14px, 1.1vw, 16px);
+  font-weight: 300;
+  line-height: 2;
+  color: var(--ifg-muted);
+}
+
+/* Thumbnail gallery (below the description) */
+.ifg.ifg--page .ifg__thumbnails,
+.ifg.ifg--rtl .ifg__thumbnails {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 0 2.5em auto;
+}
+
+.ifg.ifg--page .ifg__thumb {
+  position: relative;
+  display: block;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  border: 1px solid transparent;
+  background: none;
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.4s var(--ifg-ease), border-color 0.4s var(--ifg-ease), transform 0.5s var(--ifg-ease);
+}
+
+.ifg.ifg--page .ifg__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s var(--ifg-ease);
+}
+
+.ifg.ifg--page .ifg__thumb:hover {
+  opacity: 1;
+  transform: translateY(-3px);
+}
+
+.ifg.ifg--page .ifg__thumb:hover img {
+  transform: scale(1.06);
+}
+
+.ifg.ifg--page .ifg__thumb.is-active,
+.ifg.ifg--page .ifg__thumb[aria-pressed="true"] {
+  opacity: 1;
+  border-color: var(--ifg-ink);
+}
+
+.ifg.ifg--page .ifg__thumb:focus-visible {
+  outline: 2px solid var(--ifg-ink);
+  outline-offset: 3px;
+}
+
+/* Price + Add to Cart: one elegant row */
+.ifg.ifg--page .ifg__buy,
+.ifg.ifg--rtl .ifg__buy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em 2em;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 0 0 auto;
+  padding-top: 2em;
+  border-top: 1px solid var(--ifg-line);
+}
+
+.ifg.ifg--page .ifg__buy .ifg__price,
+.ifg.ifg--rtl .ifg__buy .ifg__price {
+  margin: 0;
+  width: auto;
+  max-width: none;
+  font-family: var(--ifg-title-font);
+  font-size: clamp(22px, 2vw, 30px);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ifg-ink);
+}
+
+.ifg.ifg--page .ifg__buy .ifg__atc,
+.ifg.ifg--rtl .ifg__buy .ifg__atc {
+  min-height: 52px;
+  padding: 0 2.6em !important;
+  border: 1px solid var(--ifg-ink) !important;
+  border-radius: 999px !important;
+  background: var(--ifg-ink) !important;
+  color: #ffffff !important;
+  font-family: var(--ifg-title-font);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  transition: background-color 0.45s var(--ifg-ease), color 0.45s var(--ifg-ease), transform 0.45s var(--ifg-ease), box-shadow 0.45s var(--ifg-ease);
+}
+
+.ifg.ifg--page .ifg__buy .ifg__atc:hover,
+.ifg.ifg--page .ifg__buy .ifg__atc:focus-visible,
+.ifg.ifg--rtl .ifg__buy .ifg__atc:hover,
+.ifg.ifg--rtl .ifg__buy .ifg__atc:focus-visible {
+  background: #ffffff !important;
+  color: var(--ifg-ink) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.12) !important;
+}
+
+.ifg.ifg--page .ifg__buy .ifg__atc[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+/* Mobile: image on top, text below */
+@media (max-width: 767px) {
+  .ifg.ifg--page .ifg__preview,
+  .ifg.ifg--rtl .ifg__preview {
+    top: 0;
+    left: 0;
+    right: auto;
+    width: 100%;
+    height: 46vh;
+    height: 46svh;
+  }
+
+  .ifg.ifg--page .ifg__groups,
+  .ifg.ifg--rtl .ifg__groups {
+    padding-top: calc(46vh + 32px);
+    padding-bottom: 48px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .ifg.ifg--page .ifg__back,
+  .ifg.ifg--page .ifg__back:hover,
+  .ifg.ifg--page .ifg__back:focus,
+  .ifg.ifg--page .ifg__back:active {
+    top: 16px;
+    left: 16px;
+    mix-blend-mode: normal;
+  }
+
+  .ifg.ifg--page .ifg__title,
+  .ifg.ifg--rtl .ifg__title {
+    margin-top: 0;
+    font-size: clamp(34px, 9vw, 52px);
+  }
+
+  .ifg.ifg--page .ifg__desc,
+  .ifg.ifg--rtl .ifg__desc {
+    max-width: none;
+  }
+
+  .ifg.ifg--page .ifg__thumbnails,
+  .ifg.ifg--rtl .ifg__thumbnails {
+    max-width: none;
+  }
+
+  .ifg.ifg--page .ifg__buy,
+  .ifg.ifg--rtl .ifg__buy {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  .ifg.ifg--page .ifg__buy .ifg__atc,
+  .ifg.ifg--rtl .ifg__buy .ifg__atc {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ifg.ifg--page .ifg__thumb,
+  .ifg.ifg--page .ifg__thumb img,
+  .ifg.ifg--page .ifg__buy .ifg__atc,
+  .ifg.ifg--page .ifg__back {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+```
