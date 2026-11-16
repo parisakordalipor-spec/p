@@ -1663,3 +1663,327 @@ html.ifg-page-lock body {
     transform: none;
   }
 }
+
+/* ================================================================== */
+/* v1.7.1 — LUXURY EDITORIAL PRODUCT VIEW                             */
+/* Appended last on purpose: it overrides every earlier rule.          */
+/* Scope: the content view (.ifg__content) of the gallery.             */
+/* ================================================================== */
+
+.ifg {
+  --ifg-editorial-bg: #8a9a9b;              /* slate-green plate behind the product */
+  --ifg-editorial-ink: #111111;
+  --ifg-editorial-muted: #999999;
+  --ifg-editorial-line: rgba(17, 17, 17, 0.12);
+  --ifg-editorial-gutter: 5%;
+}
+
+/* ------------------------------------------------------------------ */
+/* 1) LEFT COLUMN — image plate                                       */
+/* ------------------------------------------------------------------ */
+
+/* The plate is the preview itself, so it is already slate-green while the   */
+/* Flip animation travels from the thumbnail into the column.                */
+.ifg .ifg__preview {
+  background-color: var(--ifg-editorial-bg) !important;
+  background-image: none !important;
+}
+
+/* Product cut-out: fully visible, resting on the bottom edge, empty space
+   kept above it. The crossfade copy matches, so switching angles is seamless. */
+.ifg .ifg__preview img,
+.ifg .ifg__preview .ifg__preview-ghost {
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  transform: none !important;
+  transition: none !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 2) SPLIT-SCREEN GEOMETRY (page mode + full-screen overlay)          */
+/* ------------------------------------------------------------------ */
+
+.ifg.ifg--page .ifg__preview,
+.ifg.ifg--overlay-fixed .ifg__preview,
+.ifg.ifg--rtl.ifg--page .ifg__preview,
+.ifg.ifg--rtl.ifg--overlay-fixed .ifg__preview {
+  top: 0 !important;
+  left: 0 !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 45% !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  aspect-ratio: auto !important;
+  border-radius: 0 !important;
+  /* the 1px separator between the two columns */
+  border-right: 1px solid var(--ifg-editorial-line) !important;
+}
+
+/* Text column. direction:ltr here is deliberate: every alignment below is
+   written with physical properties, so RTL on the page cannot flip it.      */
+.ifg.ifg--page .ifg__groups,
+.ifg.ifg--overlay-fixed .ifg__groups,
+.ifg.ifg--rtl.ifg--page .ifg__groups,
+.ifg.ifg--rtl.ifg--overlay-fixed .ifg__groups {
+  direction: ltr;
+  padding-top: 0 !important;
+  padding-bottom: 5vh !important;
+  padding-left: 47% !important;
+  padding-right: var(--ifg-editorial-gutter) !important;
+}
+
+/* The slide itself becomes a vertical stack we can reorder */
+.ifg.ifg--page .ifg__group.active,
+.ifg.ifg--overlay-fixed .ifg__group.active {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 3) TYPE & ACTION AREA — right edge, editorial scale                 */
+/* ------------------------------------------------------------------ */
+
+.ifg.ifg--page .ifg__title,
+.ifg.ifg--overlay-fixed .ifg__title {
+  order: 1;
+  width: auto !important;
+  max-width: 100% !important;
+  margin-top: clamp(56px, 24vh, 210px) !important;
+  margin-bottom: 0.3em !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  font-size: clamp(40px, 5.5vw, 80px) !important;
+  font-weight: 800 !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.015em !important;
+  text-align: right !important;
+  color: var(--ifg-editorial-ink) !important;
+}
+
+.ifg.ifg--page .ifg__proof,
+.ifg.ifg--overlay-fixed .ifg__proof {
+  order: 2;
+  margin: 0 0 1em auto !important;
+  justify-content: flex-end !important;
+}
+
+/* Slightly indented paragraph, soft grey */
+.ifg.ifg--page .ifg__desc,
+.ifg.ifg--overlay-fixed .ifg__desc {
+  order: 3;
+  width: auto !important;
+  max-width: 50ch !important;
+  margin: 0 0 2.2em auto !important;
+  padding: 0 0.9em 0 0 !important;
+  font-size: clamp(13px, 1.05vw, 16px) !important;
+  font-weight: 300 !important;
+  line-height: 1.9 !important;
+  text-align: right !important;
+  color: var(--ifg-editorial-muted) !important;
+}
+
+/* Price + "Add to cart", right-aligned, button hugging the edge */
+.ifg.ifg--page .ifg__buy,
+.ifg.ifg--overlay-fixed .ifg__buy {
+  order: 4;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 0.4em 1.1em !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 0 2.4em auto !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+}
+
+.ifg.ifg--page .ifg__buy .ifg__price,
+.ifg.ifg--overlay-fixed .ifg__buy .ifg__price {
+  order: 1;
+  width: auto !important;
+  margin: 0 !important;
+  font-size: clamp(17px, 1.4vw, 22px) !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  color: var(--ifg-editorial-ink) !important;
+  white-space: nowrap;
+}
+
+/* Sleek black pill */
+.ifg.ifg--page .ifg__buy .ifg__atc,
+.ifg.ifg--overlay-fixed .ifg__buy .ifg__atc,
+.ifg.ifg--page .ifg__buy .ifg__atc:hover,
+.ifg.ifg--page .ifg__buy .ifg__atc:focus,
+.ifg.ifg--overlay-fixed .ifg__buy .ifg__atc:hover,
+.ifg.ifg--overlay-fixed .ifg__buy .ifg__atc:focus {
+  order: 2;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 50px !important;
+  padding: 0 2.4em !important;
+  border: 1px solid var(--ifg-editorial-ink) !important;
+  border-radius: 999px !important;
+  background: var(--ifg-editorial-ink) !important;
+  color: #ffffff !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.03em !important;
+  text-transform: none !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  transition: background-color 0.35s ease, color 0.35s ease, transform 0.35s ease !important;
+}
+
+.ifg.ifg--page .ifg__buy .ifg__atc:hover,
+.ifg.ifg--page .ifg__buy .ifg__atc:focus-visible,
+.ifg.ifg--overlay-fixed .ifg__buy .ifg__atc:hover,
+.ifg.ifg--overlay-fixed .ifg__buy .ifg__atc:focus-visible {
+  background: #ffffff !important;
+  color: var(--ifg-editorial-ink) !important;
+  transform: translateY(-2px);
+}
+
+/* ------------------------------------------------------------------ */
+/* 4) THUMBNAIL GALLERY — 4-column grid under the action area          */
+/* ------------------------------------------------------------------ */
+
+.ifg.ifg--page .ifg__thumbs,
+.ifg.ifg--overlay-fixed .ifg__thumbs,
+.ifg.ifg--rtl.ifg--page .ifg__thumbs,
+.ifg.ifg--rtl.ifg--overlay-fixed .ifg__thumbs {
+  order: 5;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  margin: 0 0 0 auto !important;
+  padding: 0 !important;
+}
+
+.ifg.ifg--page .ifg__thumb,
+.ifg.ifg--overlay-fixed .ifg__thumb,
+.ifg.ifg--page .ifg__thumb:hover,
+.ifg.ifg--overlay-fixed .ifg__thumb:hover,
+.ifg.ifg--page .ifg__thumb:focus,
+.ifg.ifg--overlay-fixed .ifg__thumb:focus {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid transparent !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.35s ease, border-color 0.35s ease !important;
+}
+
+.ifg.ifg--page .ifg__thumb img,
+.ifg.ifg--overlay-fixed .ifg__thumb img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  transform: none !important;
+  filter: saturate(0.9);
+  transition: filter 0.35s ease !important;
+}
+
+.ifg.ifg--page .ifg__thumb:hover,
+.ifg.ifg--overlay-fixed .ifg__thumb:hover,
+.ifg.ifg--page .ifg__thumb:focus-visible,
+.ifg.ifg--overlay-fixed .ifg__thumb:focus-visible {
+  opacity: 1;
+}
+
+.ifg.ifg--page .ifg__thumb:hover img,
+.ifg.ifg--overlay-fixed .ifg__thumb:hover img {
+  filter: saturate(1);
+}
+
+.ifg.ifg--page .ifg__thumb.is-active,
+.ifg.ifg--overlay-fixed .ifg__thumb.is-active,
+.ifg.ifg--page .ifg__thumb[aria-pressed="true"],
+.ifg.ifg--overlay-fixed .ifg__thumb[aria-pressed="true"] {
+  opacity: 1;
+  border-color: var(--ifg-editorial-ink) !important;
+}
+
+.ifg.ifg--page .ifg__thumb:focus-visible,
+.ifg.ifg--overlay-fixed .ifg__thumb:focus-visible {
+  outline: 2px solid var(--ifg-editorial-ink) !important;
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 5) SMALL SCREENS — plate on top, text below                        */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 767px) {
+  .ifg.ifg--page .ifg__preview,
+  .ifg.ifg--overlay-fixed .ifg__preview,
+  .ifg.ifg--rtl.ifg--page .ifg__preview,
+  .ifg.ifg--rtl.ifg--overlay-fixed .ifg__preview {
+    left: 0 !important;
+    right: auto !important;
+    width: 100% !important;
+    height: 46vh !important;
+    height: 46svh !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--ifg-editorial-line) !important;
+  }
+
+  .ifg.ifg--page .ifg__groups,
+  .ifg.ifg--overlay-fixed .ifg__groups,
+  .ifg.ifg--rtl.ifg--page .ifg__groups,
+  .ifg.ifg--rtl.ifg--overlay-fixed .ifg__groups {
+    padding-top: calc(46svh + 26px) !important;
+    padding-bottom: 40px !important;
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+  }
+
+  .ifg.ifg--page .ifg__title,
+  .ifg.ifg--overlay-fixed .ifg__title {
+    margin-top: 0 !important;
+    font-size: clamp(30px, 9vw, 52px) !important;
+  }
+
+  .ifg.ifg--page .ifg__desc,
+  .ifg.ifg--overlay-fixed .ifg__desc {
+    max-width: none !important;
+    padding-right: 0 !important;
+  }
+
+  .ifg.ifg--page .ifg__buy,
+  .ifg.ifg--overlay-fixed .ifg__buy {
+    margin-bottom: 1.8em !important;
+  }
+
+  .ifg.ifg--page .ifg__thumbs,
+  .ifg.ifg--overlay-fixed .ifg__thumbs {
+    max-width: none !important;
+    gap: 8px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ifg .ifg__thumb,
+  .ifg .ifg__thumb img,
+  .ifg.ifg--page .ifg__buy .ifg__atc,
+  .ifg.ifg--overlay-fixed .ifg__buy .ifg__atc {
+    transition: none !important;
+    transform: none !important;
+  }
+}
