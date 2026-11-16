@@ -500,6 +500,33 @@ class Gallery_Widget extends Widget_Base {
 			'condition'   => [ 'source' => 'product', 'showAtc' => 'yes', 'atcViewCart' => 'yes' ],
 		] );
 
+		/* -- WooCommerce: angle gallery (product gallery images) -- */
+		$this->add_control( 'thumbs_heading', [
+			'label'     => esc_html__( 'گالری زوایای محصول', 'ifg' ),
+			'type'      => Controls_Manager::HEADING,
+			'separator' => 'before',
+			'condition' => [ 'source' => 'product' ],
+		] );
+
+		$this->add_control( 'showThumbs', [
+			'label'        => esc_html__( 'نمایش تصاویر زوایای مختلف زیر متن', 'ifg' ),
+			'description'  => esc_html__( 'تصاویر «گالری محصول» ووکامرس. با کلیک روی هر بندانگشتی، تصویر بزرگ کنار عوض می‌شود.', 'ifg' ),
+			'type'         => Controls_Manager::SWITCHER,
+			'return_value' => 'yes',
+			'default'      => 'yes',
+			'condition'    => [ 'source' => 'product' ],
+		] );
+
+		$this->add_control( 'thumbsMax', [
+			'label'     => esc_html__( 'حداکثر تعداد بندانگشتی', 'ifg' ),
+			'type'      => Controls_Manager::NUMBER,
+			'min'       => 1,
+			'max'       => 12,
+			'step'      => 1,
+			'default'   => 4,
+			'condition' => [ 'source' => 'product', 'showThumbs' => 'yes' ],
+		] );
+
 		/* -- WooCommerce: Category filter bar -- */
 		$this->add_control( 'filter_heading', [
 			'label'     => esc_html__( 'نوار فیلتر دسته‌بندی', 'ifg' ),
@@ -1365,6 +1392,65 @@ class Gallery_Widget extends Widget_Base {
 			'selector' => '{{WRAPPER}} .ifg__atc',
 		] );
 
+		/* -- Angle gallery -- */
+		$this->add_control( 'thumbs_style_heading', [
+			'label'     => esc_html__( 'گالری زوایای محصول', 'ifg' ),
+			'type'      => Controls_Manager::HEADING,
+			'separator' => 'before',
+			'condition' => [ 'source' => 'product', 'showThumbs' => 'yes' ],
+		] );
+
+		$this->add_responsive_control( 'thumbWidth', [
+			'label'      => esc_html__( 'عرض هر بندانگشتی', 'ifg' ),
+			'type'       => Controls_Manager::SLIDER,
+			'size_units' => [ 'px' ],
+			'range'      => [ 'px' => [ 'min' => 24, 'max' => 220, 'step' => 1 ] ],
+			'default'    => [ 'unit' => 'px', 'size' => 68 ],
+			'selectors'  => [ '{{WRAPPER}} .ifg' => '--ifg-thumb-w: {{SIZE}}{{UNIT}};' ],
+			'condition'  => [ 'source' => 'product', 'showThumbs' => 'yes' ],
+		] );
+
+		$this->add_responsive_control( 'thumbGap', [
+			'label'      => esc_html__( 'فاصله بندانگشتی‌ها', 'ifg' ),
+			'type'       => Controls_Manager::SLIDER,
+			'size_units' => [ 'px' ],
+			'range'      => [ 'px' => [ 'min' => 0, 'max' => 60, 'step' => 1 ] ],
+			'default'    => [ 'unit' => 'px', 'size' => 10 ],
+			'selectors'  => [ '{{WRAPPER}} .ifg' => '--ifg-thumb-gap: {{SIZE}}{{UNIT}};' ],
+			'condition'  => [ 'source' => 'product', 'showThumbs' => 'yes' ],
+		] );
+
+		$this->add_control( 'thumbAspect', [
+			'label'     => esc_html__( 'نسبت تصویر بندانگشتی', 'ifg' ),
+			'type'      => Controls_Manager::SELECT,
+			'default'   => '0.88',
+			'options'   => [
+				'1'                 => esc_html__( 'مربع (۱:۱)', 'ifg' ),
+				'0.88'              => esc_html__( 'پرتره (۴:۵)', 'ifg' ),
+				'0.75'              => esc_html__( 'پرتره بلند (۳:۴)', 'ifg' ),
+				'1.5'               => esc_html__( 'افقی (۳:۲)', 'ifg' ),
+			],
+			'selectors' => [ '{{WRAPPER}} .ifg' => '--ifg-thumb-ratio: {{VALUE}};' ],
+			'condition' => [ 'source' => 'product', 'showThumbs' => 'yes' ],
+		] );
+
+		$this->add_control( 'thumbRadius', [
+			'label'      => esc_html__( 'گردی گوشه بندانگشتی', 'ifg' ),
+			'type'       => Controls_Manager::SLIDER,
+			'size_units' => [ 'px' ],
+			'range'      => [ 'px' => [ 'min' => 0, 'max' => 40, 'step' => 1 ] ],
+			'default'    => [ 'unit' => 'px', 'size' => 0 ],
+			'selectors'  => [ '{{WRAPPER}} .ifg' => '--ifg-thumb-radius: {{SIZE}}{{UNIT}};' ],
+			'condition'  => [ 'source' => 'product', 'showThumbs' => 'yes' ],
+		] );
+
+		$this->add_control( 'thumbActiveColor', [
+			'label'     => esc_html__( 'رنگ حاشیه بندانگشتی فعال', 'ifg' ),
+			'type'      => Controls_Manager::COLOR,
+			'selectors' => [ '{{WRAPPER}} .ifg' => '--ifg-thumb-active: {{VALUE}};' ],
+			'condition' => [ 'source' => 'product', 'showThumbs' => 'yes' ],
+		] );
+
 		$this->add_control( 'filterColor', [
 			'label'     => esc_html__( 'رنگ متن فیلتر', 'ifg' ),
 			'type'      => Controls_Manager::COLOR,
@@ -1469,6 +1555,53 @@ class Gallery_Widget extends Widget_Base {
 	private function plain_excerpt( $post ) {
 		$text = '' !== trim( (string) $post->post_excerpt ) ? $post->post_excerpt : $post->post_content;
 		return wp_trim_words( wp_strip_all_tags( strip_shortcodes( (string) $text ) ), 45 );
+	}
+
+	/**
+	 * The product's own image plus its WooCommerce gallery images ("different angles").
+	 *
+	 * Each entry carries the small candidate used in the strip and the full size the big preview swaps to,
+	 * so switching an angle never downloads the full file until it is actually shown.
+	 */
+	private function product_thumbs( $product, $main_id, $s ) {
+		$max = (int) ( $s['thumbsMax'] ?? 4 );
+		if ( $max < 1 ) {
+			return [];
+		}
+
+		$ids = [];
+		if ( $main_id ) {
+			$ids[] = (int) $main_id;
+		}
+		foreach ( (array) $product->get_gallery_image_ids() as $gid ) {
+			$ids[] = (int) $gid;
+		}
+		$ids = array_values( array_unique( array_filter( $ids ) ) );
+		if ( count( $ids ) < 2 ) {
+			return []; // A single picture has nothing to switch between.
+		}
+
+		$out   = [];
+		$title = $product->get_name();
+		foreach ( array_slice( $ids, 0, $max ) as $gid ) {
+			$src = Group_Control_Image_Size::get_attachment_image_src( $gid, 'thumb', $s );
+			if ( ! $src ) {
+				$src = wp_get_attachment_image_url( $gid, 'woocommerce_thumbnail' );
+			}
+			if ( ! $src ) {
+				continue;
+			}
+			$full = wp_get_attachment_image_url( $gid, 'full' );
+			$out[] = [
+				'id'     => $gid,
+				'src'    => $src,
+				'full'   => $full ? $full : $src,
+				'srcset' => $this->img_srcset( $gid, $s ),
+				'alt'    => get_post_meta( $gid, '_wp_attachment_image_alt', true ) ?: $title,
+			];
+		}
+
+		return count( $out ) > 1 ? $out : [];
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -1619,6 +1752,7 @@ class Gallery_Widget extends Widget_Base {
 		$blank = [
 			'id' => 0, 'caption' => '', 'desc' => '', 'url' => '', 'new_tab' => false, 'rel' => '', 'width' => '', 'stagger' => '',
 			'srcset' => '', 'price' => '', 'stock' => '', 'atc' => null, 'video' => null, 'rating' => null, 'sale' => null,
+			'thumbs' => [],
 		];
 
 		if ( 'product' === $source && function_exists( 'wc_get_product' ) ) {
@@ -1762,6 +1896,7 @@ class Gallery_Widget extends Widget_Base {
 					'atc'     => $atc,
 					'rating'  => $rating,
 					'sale'    => $sale,
+					'thumbs'  => ( $product && 'yes' === ( $s['showThumbs'] ?? 'yes' ) ) ? $this->product_thumbs( $product, $thumb_id, $s ) : [],
 				] );
 			}
 			wp_reset_postdata();
@@ -2104,7 +2239,21 @@ class Gallery_Widget extends Widget_Base {
 						<?php endif; ?>
 					</div>
 				<?php endif; ?>
-			<?php if ( $has_price || $atc ) : ?>
+				<?php if ( '' !== trim( (string) $sl['desc'] ) ) : ?>
+					<p class="ifg__desc" dir="auto"><?php echo nl2br( esc_html( $sl['desc'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped, then line breaks added ?></p>
+				<?php endif; ?>
+				<?php if ( ! empty( $sl['thumbs'] ) ) : ?>
+					<?php // Product angles. Real buttons, so the strip is keyboard operable and announces which picture is showing. ?>
+					<div class="ifg__thumbs" role="group" aria-label="<?php esc_attr_e( 'Product angles', 'ifg' ); ?>">
+						<?php foreach ( $sl['thumbs'] as $ti => $th ) : ?>
+							<button type="button" class="ifg__thumb<?php echo 0 === $ti ? ' is-active' : ''; ?>" aria-pressed="<?php echo 0 === $ti ? 'true' : 'false'; ?>" data-full="<?php echo esc_url( $th['full'] ); ?>" data-alt="<?php echo esc_attr( $th['alt'] ); ?>">
+								<img src="<?php echo esc_url( $th['src'] ); ?>"<?php echo $th['srcset'] ? ' srcset="' . esc_attr( $th['srcset'] ) . '" sizes="(max-width: 767px) 30vw, 150px"' : ''; ?> alt="" loading="lazy" decoding="async" draggable="false" class="skip-lazy no-lazy" data-skip-lazy="1" data-no-lazy="1">
+								<span class="ifg-sr"><?php echo esc_html( sprintf( /* translators: 1: picture number, 2: product name */ __( 'Show picture %1$d of %2$s', 'ifg' ), $ti + 1, wp_strip_all_tags( $sl['title'] ) ) ); ?></span>
+							</button>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
+				<?php if ( $has_price || $atc ) : ?>
 					<?php // Price + Add to cart sit together. The script animates this block as one piece (it is not split into letters, so the button label can change safely). ?>
 					<div class="ifg__buy">
 						<?php if ( $has_price ) : ?>
@@ -2124,9 +2273,6 @@ class Gallery_Widget extends Widget_Base {
 							</a>
 						<?php endif; ?>
 					</div>
-				<?php endif; ?>
-				<?php if ( '' !== trim( (string) $sl['desc'] ) ) : ?>
-					<p class="ifg__desc" dir="auto"><?php echo nl2br( esc_html( $sl['desc'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped, then line breaks added ?></p>
 				<?php endif; ?>
 				<?php // An add-to-cart button already is the action: a second link (even a hidden one) only adds clutter and tab stops. ?>
 				<?php if ( ! $atc && ! empty( $sl['url'] ) && ! empty( $s['ctaLabel'] ) ) : ?>

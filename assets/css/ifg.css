@@ -1401,247 +1401,220 @@ html.ifg-page-lock body {
   }
 }
 
+/* ================================================================== */
+/* v1.7 — Product angles (thumbnail strip) + editorial product view    */
+/* ================================================================== */
 
+/* ---------------- Angle strip (all display modes) ---------------- */
+.ifg .ifg__thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ifg-thumb-gap, 10px);
+  width: fit-content;
+  max-width: min(50ch, 100%);
+  /* Logical margins: starts against the end of the text column in both LTR and RTL */
+  margin-block: 1.5em 0;
+  margin-inline: auto 10vw;
+  padding: 0;
+  list-style: none;
+}
 
+/* Buttons — must survive theme / Elementor Kit button styles, exactly like .ifg__back */
+.ifg .ifg__thumb,
+.ifg .ifg__thumb:hover,
+.ifg .ifg__thumb:focus,
+.ifg .ifg__thumb:active {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: var(--ifg-thumb-w, 68px);
+  min-width: 0;
+  height: auto;
+  aspect-ratio: var(--ifg-thumb-ratio, 0.8);
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  border: 1px solid transparent !important;
+  border-radius: var(--ifg-thumb-radius, 0) !important;
+  background: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  opacity: 0.55;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: opacity 0.3s ease, border-color 0.3s ease;
+}
 
-اگه لینک براتون باز نشد، کد کامل رو همینجا می‌ذارم. کل متن رو کپی کن و توی فایلی به اسم `ifg-split-screen.css` ذخیره کن، یا مستقیم به آخر `assets/css/ifg.css` اضافه کن.
+.ifg .ifg__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  object-fit: cover;
+  object-position: var(--ifg-img-pos, 50% 50%);
+  transform: none;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
 
-```css
-/* ============================================================
-   Editorial Split-Screen: product overlay
-   ============================================================ */
+.ifg .ifg__thumb:hover,
+.ifg .ifg__thumb:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .ifg .ifg__thumb:hover img {
+    transform: scale(1.07);
+  }
+}
+
+.ifg .ifg__thumb.is-active,
+.ifg .ifg__thumb[aria-pressed="true"] {
+  opacity: 1;
+  border-color: var(--ifg-thumb-active, var(--ifg-title-color)) !important;
+}
+
+.ifg .ifg__thumb:focus-visible {
+  outline: 2px solid var(--ifg-title-color);
+  outline-offset: 3px;
+}
+
+/* The outgoing picture of the angle crossfade (created by the script, removed after the fade) */
+.ifg .ifg__preview .ifg__preview-ghost {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  object-fit: var(--ifg-img-fit, cover);
+  object-position: var(--ifg-img-pos, 50% 50%);
+  transform: none;
+  pointer-events: none;
+  transition: none;
+}
+
+/* ---------------- Editorial product view (page / full-screen) ---------------- */
 
 .ifg.ifg--page,
 .ifg.ifg--overlay-fixed {
-  --ifg-bg: #f0f0f0;
-  --ifg-overlay-bg: #f0f0f0;
   --ifg-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --ifg-ink: #111111;
-  --ifg-muted: #6b6b6b;
-  --ifg-line: #d6d6d6;
-  --ifg-title-font: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif;
-  background: #f0f0f0;
 }
 
+/* Neutral studio backdrop only when the widget has no colour of its own */
 .ifg.ifg--page .ifg__content,
 .ifg.ifg--overlay-fixed .ifg__content {
-  background: #f0f0f0;
+  background: var(--ifg-overlay-bg, #f2f2f2);
 }
 
-/* Image: fixed left column, full height */
-.ifg.ifg--page .ifg__preview,
-.ifg.ifg--rtl .ifg__preview {
+.ifg.ifg--overlay-fixed .ifg__content::before {
+  background: var(--ifg-overlay-bg, #f2f2f2);
+}
+
+/* Image: full-height column on the leading edge */
+.ifg.ifg--page .ifg__preview {
   top: 0;
   left: 0;
   right: auto;
   bottom: auto;
-  width: 45%;
+  width: 42%;
   height: 100vh;
   height: 100dvh;
   aspect-ratio: auto;
   border-radius: 0;
 }
 
-.ifg.ifg--page .ifg__preview img,
-.ifg.ifg--rtl .ifg__preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.ifg.ifg--rtl.ifg--page .ifg__preview {
+  left: auto;
+  right: 0;
 }
 
-/* Text column: starts after the image, breathing room on the right */
-.ifg.ifg--page .ifg__groups,
-.ifg.ifg--rtl .ifg__groups {
-  padding-top: clamp(72px, 10vh, 128px);
-  padding-bottom: 6vh;
-  padding-left: 50%;
-  padding-right: 5vw;
-  background: #f0f0f0;
+.ifg.ifg--page .ifg__preview img {
+  object-fit: var(--ifg-img-fit, cover);
 }
 
-/* Back button: minimal, uppercase, top-left of the screen */
-.ifg.ifg--page .ifg__back,
-.ifg.ifg--page .ifg__back:hover,
-.ifg.ifg--page .ifg__back:focus,
-.ifg.ifg--page .ifg__back:active {
-  position: fixed;
-  inset-inline-start: auto;
-  inset-inline-end: auto;
-  top: 28px;
-  left: 28px;
-  z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  align-self: auto;
+/* Text column: starts after the image, breathing room at the far edge */
+.ifg.ifg--page .ifg__groups {
+  padding-top: 0;
+  padding-bottom: 7vh;
+  padding-left: 48%;
+  padding-right: 6vw;
+}
+
+.ifg.ifg--rtl.ifg--page .ifg__groups {
+  padding-left: 6vw;
+  padding-right: 48%;
+}
+
+.ifg.ifg--page .ifg__back {
+  margin-top: 22px;
+}
+
+/* Title: hugging the far edge, with the demo's generous top gap (size comes from Style > Typography) */
+.ifg.ifg--page .ifg__title {
+  margin-block: clamp(48px, 24vh, 220px) 0.4em;
+}
+
+/* Short description right under the title, used as the "product note" */
+.ifg.ifg--page .ifg__desc {
   width: auto;
-  margin: 0 !important;
-  padding: 10px 18px !important;
-  border: 0 !important;
-  border-radius: 999px !important;
-  background: rgba(240, 240, 240, 0.85) !important;
-  box-shadow: none !important;
-  color: var(--ifg-ink) !important;
-  font-family: var(--ifg-title-font);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  line-height: 1;
-  text-transform: uppercase;
-  text-decoration: none;
-  white-space: nowrap;
-  mix-blend-mode: normal;
-  backdrop-filter: blur(8px);
-  transition: transform 0.4s var(--ifg-ease), background-color 0.4s var(--ifg-ease);
-}
-
-.ifg.ifg--page .ifg__back:hover {
-  background: #ffffff !important;
-  text-decoration: none;
-  transform: translateX(-3px);
-}
-
-.ifg.ifg--page .ifg__back:focus-visible {
-  outline: 1px solid var(--ifg-ink);
-  outline-offset: 4px;
-}
-
-/* Title: very large and bold */
-.ifg.ifg--page .ifg__title,
-.ifg.ifg--rtl .ifg__title {
-  margin: 0 0 0.45em auto;
-  font-family: var(--ifg-title-font);
-  font-weight: 800;
-  font-style: normal;
-  font-size: clamp(40px, 5vw, 80px);
-  line-height: 1.05;
-  letter-spacing: -0.01em;
-  color: var(--ifg-ink);
-}
-
-/* Description: subtle gray */
-.ifg.ifg--page .ifg__desc,
-.ifg.ifg--rtl .ifg__desc {
-  margin: 0 0 2.5em auto;
   max-width: 44ch;
-  font-family: var(--ifg-title-font);
-  font-size: clamp(14px, 1.1vw, 16px);
-  font-weight: 300;
-  line-height: 2;
-  color: var(--ifg-muted);
+  margin-block: 0.6em 0;
+  margin-inline: auto 0;
+  line-height: 1.7;
+  color: var(--ifg-desc-color);
 }
 
-/* Thumbnail gallery (below the description) */
-.ifg.ifg--page .ifg__thumbnails,
-.ifg.ifg--rtl .ifg__thumbnails {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  width: 100%;
-  max-width: 420px;
-  margin: 0 0 2.5em auto;
+.ifg.ifg--page .ifg__proof {
+  margin-top: 0.75em;
 }
 
-.ifg.ifg--page .ifg__thumb {
-  position: relative;
-  display: block;
-  padding: 0;
-  aspect-ratio: 1 / 1;
-  border: 1px solid transparent;
-  background: none;
-  overflow: hidden;
-  cursor: pointer;
-  opacity: 0.5;
-  transition: opacity 0.4s var(--ifg-ease), border-color 0.4s var(--ifg-ease), transform 0.5s var(--ifg-ease);
+.ifg.ifg--page .ifg__thumbs {
+  margin-block: 1.75em 0;
+  margin-inline: auto 0;
 }
 
-.ifg.ifg--page .ifg__thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.6s var(--ifg-ease);
-}
-
-.ifg.ifg--page .ifg__thumb:hover {
-  opacity: 1;
-  transform: translateY(-3px);
-}
-
-.ifg.ifg--page .ifg__thumb:hover img {
-  transform: scale(1.06);
-}
-
-.ifg.ifg--page .ifg__thumb.is-active,
-.ifg.ifg--page .ifg__thumb[aria-pressed="true"] {
-  opacity: 1;
-  border-color: var(--ifg-ink);
-}
-
-.ifg.ifg--page .ifg__thumb:focus-visible {
-  outline: 2px solid var(--ifg-ink);
-  outline-offset: 3px;
-}
-
-/* Price + Add to Cart: one elegant row */
-.ifg.ifg--page .ifg__buy,
-.ifg.ifg--rtl .ifg__buy {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1em 2em;
-  width: 100%;
-  max-width: 480px;
-  margin: 0 0 0 auto;
-  padding-top: 2em;
-  border-top: 1px solid var(--ifg-line);
-}
-
-.ifg.ifg--page .ifg__buy .ifg__price,
-.ifg.ifg--rtl .ifg__buy .ifg__price {
-  margin: 0;
+/* Price + Add to cart sit on one calm row under the strip */
+.ifg.ifg--page .ifg__buy {
   width: auto;
-  max-width: none;
-  font-family: var(--ifg-title-font);
-  font-size: clamp(22px, 2vw, 30px);
+  max-width: 44ch;
+  margin-block: 2em 0;
+  margin-inline: auto 0;
+  padding-top: 1.5em;
+  border-top: 1px solid var(--ifg-line, rgba(0, 0, 0, 0.12));
+  justify-content: space-between;
+}
+
+.ifg.ifg--page .ifg__buy .ifg__price {
+  font-size: clamp(18px, 1.5vw, 24px);
   font-weight: 600;
-  line-height: 1.2;
-  color: var(--ifg-ink);
 }
 
-.ifg.ifg--page .ifg__buy .ifg__atc,
-.ifg.ifg--rtl .ifg__buy .ifg__atc {
-  min-height: 52px;
-  padding: 0 2.6em !important;
-  border: 1px solid var(--ifg-ink) !important;
-  border-radius: 999px !important;
-  background: var(--ifg-ink) !important;
-  color: #ffffff !important;
-  font-family: var(--ifg-title-font);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  transition: background-color 0.45s var(--ifg-ease), color 0.45s var(--ifg-ease), transform 0.45s var(--ifg-ease), box-shadow 0.45s var(--ifg-ease);
-}
-
-.ifg.ifg--page .ifg__buy .ifg__atc:hover,
-.ifg.ifg--page .ifg__buy .ifg__atc:focus-visible,
-.ifg.ifg--rtl .ifg__buy .ifg__atc:hover,
-.ifg.ifg--rtl .ifg__buy .ifg__atc:focus-visible {
-  background: #ffffff !important;
-  color: var(--ifg-ink) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.12) !important;
-}
-
-.ifg.ifg--page .ifg__buy .ifg__atc[aria-busy="true"] {
-  opacity: 0.6;
-}
-
-/* Mobile: image on top, text below */
+/* Small screens: image on top, text below (the strip stays start-aligned) */
 @media (max-width: 767px) {
-  .ifg.ifg--page .ifg__preview,
-  .ifg.ifg--rtl .ifg__preview {
+  .ifg .ifg__thumbs {
+    margin-inline: 0;
+    max-width: none;
+  }
+
+  .ifg .ifg__thumb {
+    width: var(--ifg-thumb-w, 56px);
+  }
+
+  .ifg.ifg--page .ifg__preview {
     top: 0;
     left: 0;
     right: auto;
@@ -1651,59 +1624,42 @@ html.ifg-page-lock body {
   }
 
   .ifg.ifg--page .ifg__groups,
-  .ifg.ifg--rtl .ifg__groups {
-    padding-top: calc(46vh + 32px);
+  .ifg.ifg--rtl.ifg--page .ifg__groups {
+    padding-top: calc(46vh + 24px);
     padding-bottom: 48px;
-    padding-left: 24px;
-    padding-right: 24px;
+    padding-left: 20px;
+    padding-right: 20px;
   }
 
-  .ifg.ifg--page .ifg__back,
-  .ifg.ifg--page .ifg__back:hover,
-  .ifg.ifg--page .ifg__back:focus,
-  .ifg.ifg--page .ifg__back:active {
-    top: 16px;
-    left: 16px;
-    mix-blend-mode: normal;
-  }
-
-  .ifg.ifg--page .ifg__title,
-  .ifg.ifg--rtl .ifg__title {
+  .ifg.ifg--page .ifg__back {
     margin-top: 0;
-    font-size: clamp(34px, 9vw, 52px);
+  }
+
+  .ifg.ifg--page .ifg__title {
+    margin-block: 0.5em 0.4em;
   }
 
   .ifg.ifg--page .ifg__desc,
-  .ifg.ifg--rtl .ifg__desc {
+  .ifg.ifg--page .ifg__thumbs,
+  .ifg.ifg--page .ifg__buy {
+    margin-inline: 0;
     max-width: none;
+    text-align: start;
   }
 
-  .ifg.ifg--page .ifg__thumbnails,
-  .ifg.ifg--rtl .ifg__thumbnails {
-    max-width: none;
-  }
-
-  .ifg.ifg--page .ifg__buy,
-  .ifg.ifg--rtl .ifg__buy {
+  .ifg.ifg--page .ifg__buy {
     flex-direction: column;
     align-items: stretch;
-    justify-content: flex-start;
-    max-width: none;
-  }
-
-  .ifg.ifg--page .ifg__buy .ifg__atc,
-  .ifg.ifg--rtl .ifg__buy .ifg__atc {
-    width: 100%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ifg.ifg--page .ifg__thumb,
-  .ifg.ifg--page .ifg__thumb img,
-  .ifg.ifg--page .ifg__buy .ifg__atc,
-  .ifg.ifg--page .ifg__back {
+  .ifg .ifg__thumb,
+  .ifg .ifg__thumb img {
     transition: none !important;
-    transform: none !important;
+  }
+
+  .ifg .ifg__thumb:hover img {
+    transform: none;
   }
 }
-```

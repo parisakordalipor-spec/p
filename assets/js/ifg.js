@@ -546,6 +546,8 @@
     this.mountToken = 0;
     this.buy = null;
     this.proof = null;
+    this.thumbs = null;
+    this.ghost = null;
 
     this.content = root.querySelector(".ifg__content");
     this.preview = root.querySelector(".ifg__preview");
@@ -559,6 +561,11 @@
     this.split = null;
     this.state = "closed";
     this.preview.dataset.flipId = "preview";
+
+    // Product angles: one delegated listener on the dialog (the groups are plain markup, not re-bound per slide)
+    var self = this;
+    this.onThumbClick = function (e) { self.handleThumb(e); };
+    this.content.addEventListener("click", this.onThumbClick);
   }
 
   Transition.prototype.imgScale = function () {
@@ -595,8 +602,11 @@
       // Rating / sale line: same treatment. Its star overlay and badge would break if split into letters.
       var proof = activeGroup ? activeGroup.querySelector(".ifg__proof") : null;
       self.proof = proof;
+      // Angle strip: same treatment as the buy block — splitting its contents into lines/letters would break the <img>
+      var thumbs = activeGroup ? activeGroup.querySelector(".ifg__thumbs") : null;
+      self.thumbs = thumbs;
       var kids = activeGroup ? Array.prototype.slice.call(activeGroup.children) : [];
-      var targets = [self.back].concat(kids.filter(function (k) { return k !== buy && k !== proof; }));
+      var targets = [self.back].concat(kids.filter(function (k) { return k !== buy && k !== proof && k !== thumbs; }));
       var text = targets.map(function (t) { return t.textContent; }).join(" ");
       var effect = s.textEffect;
       if (effect === "chars" && RTL_SCRIPT.test(text)) effect = "words";
@@ -684,6 +694,14 @@
           s.textDelay + 0.25
         );
       }
+      if (thumbs) {
+        self.tl.fromTo(
+          thumbs,
+          { autoAlpha: 0, y: 24 },
+          { autoAlpha: 1, y: 0, duration: 0.9, ease: "power3.out" },
+          s.textDelay + 0.4
+        );
+      }
     });
   };
 
@@ -713,6 +731,7 @@
     var self = this;
     var s = this.s;
 
+    this.clearGhost();
     var p = this.parts();
 
     this.tl = gsap.timeline({ onComplete: function () { self.reset(); } });
@@ -742,6 +761,8 @@
 
   Transition.prototype.fillContent = function (slide, index) {
     var img = slide.querySelector(".ifg__img img");
+    this.clearGhost();
+    this.resetThumbs();
     // The thumbnail may be a small responsive candidate; the big preview loads the full configured size
     this.previewImg.removeAttribute("srcset");
     this.previewImg.src = img.getAttribute("data-full") || img.currentSrc || img.src;
@@ -775,6 +796,8 @@
     var wrapper = slide ? slide.querySelector(".ifg__img") : null;
 
     this.unmountVideo(false);
+    this.clearGhost();
+    this.resetThumbs();
     if (wrapper) delete wrapper.dataset.flipId;
 
     if (this.split) this.split.revert();
@@ -782,8 +805,10 @@
 
     if (this.buy) gsap.set(this.buy, { clearProps: "all" });
     if (this.proof) gsap.set(this.proof, { clearProps: "all" });
+    if (this.thumbs) gsap.set(this.thumbs, { clearProps: "all" });
     this.buy = null;
     this.proof = null;
+    this.thumbs = null;
 
     gsap.set(this.content, { display: "none" });
     this.content.style.removeProperty("--ifg-fade");
@@ -806,6 +831,83 @@
     var back = slide ? slide.querySelector(".ifg__slidelink") || slide : null;
     if (back) back.focus({ preventScroll: true });
     if (this.onClose) this.onClose();
+  };
+
+  /* ---- Product angles: the strip under the text swaps the big picture ---- */
+
+  // Drop the outgoing picture that is used for the crossfade
+  Transition.prototype.clearGhost = function () {
+    if (!this.ghost) return;
+    gsap.killTweensOf(this.ghost);
+    if (this.ghost.parentNode) this.ghost.parentNode.removeChild(this.ghost);
+    this.ghost = null;
+  };
+
+  // Back to "the first picture is showing" (used when another slide is opened)
+  Transition.prototype.resetThumbs = function () {
+    toArr(".ifg__group", this.root).forEach(function (group) {
+      toArr(".ifg__thumb", group).forEach(function (b, i) {
+        b.classList.toggle("is-active", i === 0);
+        b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+      });
+    });
+  };
+
+  Transition.prototype.handleThumb = function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest(".ifg__thumb") : null;
+    if (!btn) return;
+    // Only while the dialog is on screen; a stray click on a hidden group must not move the picture
+    if (this.state !== "open" && this.state !== "opening") return;
+    e.preventDefault();
+    this.showAngle(btn);
+  };
+
+  Transition.prototype.showAngle = function (btn) {
+    var self = this;
+    var src = btn.getAttribute("data-full");
+    if (!src || !this.previewImg) return;
+
+    var strip = btn.parentNode;
+    toArr(".ifg__thumb", strip).forEach(function (b) {
+      var on = b === btn;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+
+    if (this.previewImg.getAttribute("src") === src) return;
+
+    // Crossfade: the outgoing picture stays on top as a copy, the real <img> swaps underneath, then the copy fades.
+    this.clearGhost();
+    var calm = !!(this.s.respectReducedMotion && prefersReducedMotion());
+    var ghost = document.createElement("img");
+    ghost.src = this.previewImg.currentSrc || this.previewImg.src;
+    ghost.alt = "";
+    ghost.className = "ifg__preview-ghost";
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.draggable = false;
+    this.ghost = ghost;
+    this.preview.appendChild(ghost);
+
+    this.previewImg.removeAttribute("srcset");
+    this.previewImg.src = src;
+    var alt = btn.getAttribute("data-alt");
+    if (alt) this.previewImg.alt = alt;
+
+    var fade = function () {
+      if (self.ghost !== ghost) return;
+      if (calm) { self.clearGhost(); return; }
+      gsap.to(ghost, {
+        autoAlpha: 0,
+        duration: 0.45,
+        ease: "power2.out",
+        onComplete: function () { if (self.ghost === ghost) self.clearGhost(); }
+      });
+    };
+    if (this.previewImg.decode) {
+      this.previewImg.decode().then(fade).catch(fade);
+    } else {
+      fade();
+    }
   };
 
   /* ---- Video: mounted after the Flip finished, removed before the close animation ---- */
@@ -936,9 +1038,12 @@
   Transition.prototype.destroy = function () {
     if (this.tl) this.tl.kill();
     this.unmountVideo(false);
+    this.clearGhost();
+    if (this.onThumbClick) this.content.removeEventListener("click", this.onThumbClick);
     if (this.split) this.split.revert();
     if (this.buy) gsap.set(this.buy, { clearProps: "all" });
     if (this.proof) gsap.set(this.proof, { clearProps: "all" });
+    if (this.thumbs) gsap.set(this.thumbs, { clearProps: "all" });
     this.content.removeAttribute("aria-labelledby");
     gsap.set(this.content, { display: "none" });
     this.content.style.removeProperty("--ifg-fade");
