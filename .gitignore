@@ -7,3 +7,7 @@ node_modules/
 preview/
 image-search/
 .tmp-phpc/
+
+# download hub for the live preview
+index.html
+!infinite-scroll-gallery-V1.7.0-fa.zip
