@@ -777,72 +777,179 @@
     var decode = this.previewImg.decode ? this.previewImg.decode() : Promise.resolve();
     return decode
       .catch(function () {})
-      .then(function () { self.detectProductShot(); });
+      .then(function () { return self.prepareProductShot(); });
   };
 
-  // Is this picture a product shot on a studio background?
-  // The reference look is a full-bleed photo column: an editorial photograph covers the whole
-  // column, edge to edge. A WooCommerce product photo is the opposite: a small item on a flat white
-  // seamless backdrop, and dropped into that column it leaves a bright rectangle floating on the page.
+  // Prepare the big preview picture: a product shot must sit INSIDE the coloured panel like a
+  // product photographed against a studio wall, not cover the panel with its own backdrop.
   //
-  // The decision is made from pixels, never from the file extension (a WebP can be either).
-  // Two independent signals must agree before the "contain + blend" treatment is applied:
-  //   1. the picture is flat at the edges  -> most border pixels are near-white (or see-through), and
-  //   2. it is NOT edge-to-edge content    -> a full-bleed editorial photo has detail right up to the
-  //                                            frame, so its border is busy, not flat.
-  // Cross-origin images taint the canvas; a failure simply leaves the picture untouched.
-  Transition.prototype.detectProductShot = function () {
+  // WooCommerce product images are one object isolated on a flat backdrop. That backdrop is not
+  // always white - on the live site it is the page colour (#eaeeed) - so no single CSS blend mode
+  // can dissolve it into a panel of a different colour (multiply only cancels pure white; on a
+  // light-grey backdrop it leaves a visibly darker rectangle).
+  //
+  // The honest fix is to remove the backdrop: sample the border, take its mean colour, and knock out
+  // every pixel close to it, with a soft edge so the cut-out does not look jagged. The result is
+  // cached per URL and used only for the big preview; the gallery and the thumbnail strip keep the
+  // original files. Product colours are untouched - unlike any blend mode.
+  //
+  // If the canvas is tainted (cross-origin image), the picture is left alone and the CSS falls back
+  // to `contain` + a blend, which is a close approximation.
+  Transition.prototype.prepareProductShot = function () {
+    var self = this;
     var img = this.previewImg;
-    if (!img) return;
-    var apply = function (isProduct) {
+    if (!img) return Promise.resolve();
+
+    var src = img.getAttribute("src") || "";
+    if (!src) return Promise.resolve();
+
+    if (!self.shotCache) self.shotCache = {};
+
+    // Is this a product gallery? Two independent answers, cheapest first:
+    //   1. PHP sets .ifg--product when the widget source is WooCommerce (authoritative).
+    //   2. Otherwise look at the content the widget actually rendered: a slider that shows a price
+    //      and an add-to-cart row IS a product gallery, whatever the source setting is called.
+    //      This matters on real sites, where a hand-picked product list keeps source = "manual".
+    var hasBuy = !!(self.root.querySelector(".ifg__buy") || self.root.querySelector(".ifg__price") || self.root.querySelector(".ifg__atc"));
+    if (hasBuy) self.root.classList.add("ifg--has-buy");
+    var knownProduct = self.root.classList.contains("ifg--product") || hasBuy;
+
+    var done = function (isProduct) {
       img.classList.toggle("is-ifg-product", !!isProduct);
-      // `.ifg--fullbleed` overrides the no-JS PNG fallback: the script has looked at the pixels and
-      // decided this is a full-bleed editorial photograph, whatever its file extension says.
       img.classList.toggle("ifg--fullbleed", !isProduct);
       if (isProduct) img.setAttribute("data-ifg-product", "");
       else img.removeAttribute("data-ifg-product");
     };
 
-    if (!img.naturalWidth || !img.naturalHeight) return apply(false);
+    if (!img.naturalWidth || !img.naturalHeight) return (done(knownProduct), Promise.resolve());
+
+    // Cached result for this URL (thumbnail swaps hop between the same files).
+    if (self.shotCache[src]) {
+      var hit = self.shotCache[src];
+      if (hit.out) {
+        img.src = hit.out;
+        return (done(true), Promise.resolve());
+      }
+      return (done(hit.product), Promise.resolve());
+    }
+
+    var MAX = 1400;
+    var w = img.naturalWidth;
+    var h = img.naturalHeight;
+    var scale = Math.min(1, MAX / Math.max(w, h));
+    var cw = Math.max(1, Math.round(w * scale));
+    var ch = Math.max(1, Math.round(h * scale));
 
     var canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 32;
+    canvas.width = cw;
+    canvas.height = ch;
     var ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return apply(false);
+    if (!ctx) return (done(knownProduct), Promise.resolve());
 
-    var data;
+    var pixels;
     try {
-      ctx.drawImage(img, 0, 0, 32, 32);
-      data = ctx.getImageData(0, 0, 32, 32).data;
+      ctx.drawImage(img, 0, 0, cw, ch);
+      pixels = ctx.getImageData(0, 0, cw, ch);
     } catch (e) {
-      return apply(false);
+      // Tainted canvas: cannot read pixels. Fall back to the stylesheet's approximation.
+      self.shotCache[src] = { product: knownProduct, out: null };
+      return (done(knownProduct), Promise.resolve());
     }
 
-    // Walk the 1px border of the 32x32 sample: count flat (near white / transparent) pixels.
-    var flat = 0;
-    var total = 0;
-    var step;
-    var sample = function (x, y) {
-      var i = (y * 32 + x) * 4;
-      total++;
-      var a = data[i + 3];
-      if (a < 24) {
-        flat++; // see-through: a cut-out on transparency
-        return;
-      }
-      if (data[i] > 236 && data[i + 1] > 236 && data[i + 2] > 236) flat++;
+    var d = pixels.data;
+
+    // --- Backdrop colour: the median-ish mean of a 2px border -------------------------------
+    var bs = [0, 0, 0];
+    var bn = 0;
+    var edge = function (x, y) {
+      var i = (y * cw + x) * 4;
+      if (d[i + 3] < 24) return;
+      bs[0] += d[i];
+      bs[1] += d[i + 1];
+      bs[2] += d[i + 2];
+      bn++;
     };
-    for (step = 0; step < 32; step++) {
-      sample(step, 0);
-      sample(step, 31);
-      sample(0, step);
-      sample(31, step);
+    var t;
+    for (t = 0; t < cw; t += 1) {
+      edge(t, 0);
+      edge(t, 1);
+      edge(t, ch - 1);
+      edge(t, ch - 2);
+    }
+    for (t = 0; t < ch; t += 1) {
+      edge(0, t);
+      edge(1, t);
+      edge(cw - 1, t);
+      edge(cw - 2, t);
+    }
+    if (!bn) return (done(true), Promise.resolve());
+
+    var br = bs[0] / bn;
+    var bg = bs[1] / bn;
+    var bb = bs[2] / bn;
+
+    // --- Is the border flat enough to be a seamless backdrop? -------------------------------
+    var spread = 0;
+    var sp = 0;
+    var scan = function (x, y) {
+      var i = (y * cw + x) * 4;
+      if (d[i + 3] < 24) return;
+      spread += Math.abs(d[i] - br) + Math.abs(d[i + 1] - bg) + Math.abs(d[i + 2] - bb);
+      sp++;
+    };
+    for (t = 0; t < cw; t += 1) {
+      scan(t, 0);
+      scan(t, ch - 1);
+    }
+    for (t = 0; t < ch; t += 1) {
+      scan(0, t);
+      scan(cw - 1, t);
+    }
+    spread = sp ? spread / sp : 999;
+
+    // An editorial photograph has a busy border; a product shot's border is one flat colour.
+    var isProduct = knownProduct || spread < 34;
+    if (!isProduct) {
+      self.shotCache[src] = { product: false, out: null };
+      return (done(false), Promise.resolve());
     }
 
-    // A studio backdrop is flat almost everywhere along the border; an editorial photo is not.
-    // 0.82 keeps a few stray border details from flipping the decision, while a product shot that
-    // happens to touch one edge still qualifies.
-    apply(flat / Math.max(total, 1) >= 0.82);
+    // --- Knock the backdrop out, with a soft edge -------------------------------------------
+    // Everything within T0 of the backdrop becomes transparent; between T0 and T1 it fades, which
+    // keeps anti-aliased product edges from turning into a hard saw-tooth.
+    var T0 = 14;
+    var T1 = 46;
+    var i2;
+    for (i2 = 0; i2 < d.length; i2 += 4) {
+      if (d[i2 + 3] === 0) continue;
+      var dr = d[i2] - br;
+      var dg = d[i2 + 1] - bg;
+      var db = d[i2 + 2] - bb;
+      var dist = Math.sqrt(dr * dr + dg * dg + db * db);
+      if (dist <= T0) {
+        d[i2 + 3] = 0;
+      } else if (dist < T1) {
+        d[i2 + 3] = Math.round(d[i2 + 3] * ((dist - T0) / (T1 - T0)));
+      }
+    }
+    ctx.putImageData(pixels, 0, 0);
+
+    var out;
+    try {
+      out = canvas.toDataURL("image/png");
+    } catch (e2) {
+      out = null;
+    }
+
+    if (!out) {
+      self.shotCache[src] = { product: true, out: null };
+      return (done(true), Promise.resolve());
+    }
+
+    self.shotCache[src] = { product: true, out: out };
+    img.src = out;
+    done(true);
+    return Promise.resolve();
   };
 
   // Thumbnail strip: swap the big preview to another view of the same item.

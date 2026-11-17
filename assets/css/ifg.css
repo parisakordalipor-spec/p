@@ -1452,9 +1452,12 @@ html.ifg-page-lock body {
   --ifg-split-inset: 10.5vw;
   --ifg-title-inset: 7px;
   --ifg-split-measure: 445px;
-  /* Colour of the photo panel. Matches the reference page colour (#eaeeed) so the product shot
-     and the page read as one continuous block. */
-  --ifg-img-bg: var(--ifg-bg, #eaeeed);
+  /* Colour of the photo panel. The reference gives the photo column its OWN colour, clearly
+     different from the page: #708e86 (the sage wall behind the model) against a #eaeeed page.
+     An earlier revision set this equal to the page colour, so the panel disappeared and the
+     product looked like it was floating on the layout with no background at all.
+     Override with --ifg-img-bg on the widget to match your own brand. */
+  --ifg-img-bg: var(--ifg-panel, #708e86);
   --ifg-split-img-pad: 3vh 2.4vw;
   --ifg-title-offset: 31.5vh;
   --ifg-desc-offset: 1.8vh;
@@ -1470,9 +1473,16 @@ html.ifg-page-lock body {
 }
 
 /* ---- Photo column --------------------------------------------------- */
-/* LTR / no direction class: photo on the left */
+/* The reference design puts the photo column on the LEFT and the text column on the right, and it
+   stays there in every language. Only the TEXT is mirrored on a right-to-left site (its own
+   alignment and the side it hugs); the picture does not move. An earlier revision mirrored the photo
+   too, which put it on the right on a Persian site and broke the reference layout. */
 .ifg.ifg--page .ifg__preview,
-.ifg.ifg--overlay-fixed .ifg__preview {
+.ifg.ifg--overlay-fixed .ifg__preview,
+.ifg.ifg--page .ifg--rtl .ifg__preview,
+.ifg.ifg--page .ifg--dir-rtl .ifg__preview,
+.ifg.ifg--overlay-fixed .ifg--rtl .ifg__preview,
+.ifg.ifg--overlay-fixed .ifg--dir-rtl .ifg__preview {
   top: 0;
   left: 0;
   right: auto;
@@ -1482,13 +1492,6 @@ html.ifg-page-lock body {
   aspect-ratio: var(--ifg-split-ratio);
   border-radius: 0;
   margin: 0;
-}
-
-/* RTL (or the explicit "right to left" layout option): photo on the right */
-.ifg.ifg--rtl .ifg__preview,
-.ifg.ifg--dir-rtl .ifg__preview {
-  left: auto;
-  right: 0;
 }
 
 /* The photo column is a SOLID panel in the reference: it starts at the very top edge, ends at the
@@ -1520,16 +1523,22 @@ html.ifg-page-lock body {
   object-position: center;
 }
 
-/* Product shots: a white studio background would leave a bright rectangle in the middle of the
-   panel. `darken` keeps every colour of the product untouched while the white backdrop falls away
-   into the panel colour — the resulting block is flat, exactly like the reference. Transparent PNGs
-   are unaffected (they have no white to darken), so the same rule is safe for both. */
+/* Product shots sit INSIDE the panel instead of covering it: centred, with breathing room, like a
+   product photographed against a studio wall. The backdrop of the shot is REMOVED by the script
+   (prepareProductShot) rather than blended away - no blend mode can cancel a light-grey backdrop
+   against a coloured panel. With the backdrop gone, no blend and no colour shift is needed, so the
+   product keeps its true colours.
+   Authoritative path: PHP sets .ifg--product when the widget source is "product", so no guessing. */
+/* A gallery that renders WooCommerce content (price / add-to-cart) is a product gallery even when
+   the source setting is "manual" - the script marks the widget with .ifg--has-buy. */
+.ifg.ifg--product .ifg__preview img,
+.ifg.ifg--has-buy .ifg__preview img,
 .ifg .ifg__preview img[data-ifg-product],
 .ifg.ifg--page .ifg__preview img.is-ifg-product,
 .ifg.ifg--overlay-fixed .ifg__preview img.is-ifg-product {
   object-fit: contain;
-  padding: var(--ifg-split-img-pad, 3vh 2.4vw);
-  mix-blend-mode: darken;
+  padding: var(--ifg-split-img-pad, 7vh 5vw);
+  mix-blend-mode: normal;
 }
 
 /* No-JavaScript fallback: the script tags the picture with .is-ifg-product after sampling its
@@ -1541,37 +1550,35 @@ html.ifg-page-lock body {
 .ifg.ifg--page .ifg__preview img[src*=".png?"],
 .ifg.ifg--overlay-fixed .ifg__preview img[src*=".png?"] {
   object-fit: contain;
-  padding: var(--ifg-split-img-pad, 3vh 2.4vw);
-  mix-blend-mode: darken;
+  padding: var(--ifg-split-img-pad, 7vh 5vw);
+  mix-blend-mode: normal;
 }
 
-/* The script is the authority once it has run: it removes the class when the picture turns out to be
-   an editorial full-bleed photo that merely happens to be a PNG. */
-.ifg.ifg--page .ifg__preview img.ifg--fullbleed,
-.ifg.ifg--overlay-fixed .ifg__preview img.ifg--fullbleed {
+/* Editorial galleries: the script drops .ifg--fullbleed on a photograph so it covers the whole
+   column, exactly like the reference. This must NOT apply to a product gallery - there PHP already
+   decided, and a product shot is never full-bleed even if its border happens to look busy. */
+.ifg:not(.ifg--product):not(.ifg--has-buy).ifg--page .ifg__preview img.ifg--fullbleed,
+.ifg:not(.ifg--product):not(.ifg--has-buy).ifg--overlay-fixed .ifg__preview img.ifg--fullbleed {
   object-fit: cover;
   padding: 0;
   mix-blend-mode: normal;
 }
 
 /* ---- Text column ---------------------------------------------------- */
-/* LTR: text starts after the photo, on the right */
+/* The photo always occupies the left band, so the text column always starts to the right of it,
+   in both directions. Only the alignment inside that column is mirrored for RTL. */
 .ifg.ifg--page .ifg__groups,
-.ifg.ifg--overlay-fixed .ifg__groups {
+.ifg.ifg--overlay-fixed .ifg__groups,
+.ifg.ifg--page .ifg--rtl .ifg__groups,
+.ifg.ifg--page .ifg--dir-rtl .ifg__groups,
+.ifg.ifg--overlay-fixed .ifg--rtl .ifg__groups,
+.ifg.ifg--overlay-fixed .ifg--dir-rtl .ifg__groups {
   padding-block: 0;
   padding-left: calc(100vh * var(--ifg-split-ratio) + var(--ifg-split-pad));
   padding-left: calc(100dvh * var(--ifg-split-ratio) + var(--ifg-split-pad));
   padding-right: 0;
   background: transparent;
   scrollbar-width: none;
-}
-
-/* RTL: text starts after the photo, on the left */
-.ifg.ifg--rtl .ifg__groups,
-.ifg.ifg--dir-rtl .ifg__groups {
-  padding-left: 0;
-  padding-right: calc(100vh * var(--ifg-split-ratio) + var(--ifg-split-pad));
-  padding-right: calc(100dvh * var(--ifg-split-ratio) + var(--ifg-split-pad));
 }
 
 /* ---- Back button ---------------------------------------------------- */

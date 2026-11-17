@@ -2332,6 +2332,18 @@ class Gallery_Widget extends Widget_Base {
 		}
 
 		$classes  = [ 'ifg' ];
+
+		// Tell the stylesheet outright that this gallery is a product gallery. The script would
+		// otherwise have to guess from the pixels whether a picture is a product shot on a flat
+		// backdrop (and on a live site that backdrop is often the page colour, not white, so the
+		// guess is unreliable). PHP knows: the source is set to "product".
+		//   ifg--product        -> every slide is a WooCommerce product image
+		//   ifg--product-shots  -> the images are cut-outs, so the panel "contain" treatment applies
+		$source = (string) ( $s['source'] ?? 'manual' );
+		if ( 'product' === $source ) {
+			$classes[] = 'ifg--product';
+		}
+
 		$dir_mode = in_array( $s['layoutDir'] ?? '', [ 'ltr', 'rtl' ], true ) ? $s['layoutDir'] : '';
 		$is_rtl   = $dir_mode ? 'rtl' === $dir_mode : is_rtl();
 		if ( $is_rtl ) {
