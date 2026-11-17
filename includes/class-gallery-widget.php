@@ -700,6 +700,16 @@ class Gallery_Widget extends Widget_Base {
 			'description' => esc_html__( 'وقتی اسلاید لینک داشته باشد در نمای محتوا نمایش داده می‌شود.', 'ifg' ),
 		] );
 
+		$this->add_control( 'showThumbs', [
+			'label'        => esc_html__( 'نمایش تصاویر بندانگشتی در نمای محتوا', 'ifg' ),
+			'description'  => esc_html__( 'ردیف تصاویر کوچک زیر توضیحات (مثل دموی اصلی). کلیک روی هر تصویر، تصویر بزرگ را عوض می‌کند. برای محصولات ووکامرس از گالری محصول پر می‌شود.', 'ifg' ),
+			'type'         => Controls_Manager::SWITCHER,
+			'label_on'     => esc_html__( 'بله', 'ifg' ),
+			'label_off'    => esc_html__( 'خیر', 'ifg' ),
+			'return_value' => 'yes',
+			'default'      => 'yes',
+		] );
+
 		$this->add_control( 'showFrame', [
 			'label' => esc_html__( 'نمایش قاب', 'ifg' ),
 			'type' => Controls_Manager::SWITCHER,
@@ -2066,6 +2076,93 @@ class Gallery_Widget extends Widget_Base {
 	}
 
 	/**
+	 * The thumbnail strip under the description in the content view.
+	 *
+	 * It mirrors the reference layout: up to four small frames against the end edge. For a WooCommerce product
+	 * those are the product gallery images (the featured one first); for a manual slide they are the other slides,
+	 * so a manual gallery gets the strip as well. Each thumb carries the full-size URL the script swaps into the
+	 * preview; when there is nothing to show the method returns an empty string and the grid is never rendered.
+	 */
+	private function render_thumbs_html( $slides, $index ) {
+		$current = $slides[ $index ] ?? null;
+		if ( ! $current ) {
+			return '';
+		}
+
+		$items = [];
+
+		// WooCommerce product: the gallery images are the natural "more views" for this product.
+		$pid = (int) ( $current['id'] ?? 0 );
+		if ( $pid > 0 && function_exists( 'wc_get_product' ) ) {
+			$product = wc_get_product( $pid );
+			if ( $product ) {
+				$ids = array_merge( [ (int) $product->get_image_id() ], $product->get_gallery_image_ids() );
+				$ids = array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) );
+				foreach ( array_slice( $ids, 0, 4 ) as $img_id ) {
+					$thumb = wp_get_attachment_image_url( $img_id, 'medium' );
+					$full  = wp_get_attachment_image_url( $img_id, 'full' );
+					if ( ! $thumb || ! $full ) {
+						continue;
+					}
+					$items[] = [
+						'src'  => $thumb,
+						'full' => $full,
+						'alt'  => get_post_meta( $img_id, '_wp_attachment_image_alt', true ) ?: $current['title'],
+					];
+				}
+			}
+		}
+
+		// Manual slides (or a product without a gallery): the neighbouring slides, current one first,
+		// so the strip always has something meaningful to swap to.
+		if ( count( $items ) < 2 ) {
+			$items  = [];
+			$others = [];
+			foreach ( $slides as $i => $sl ) {
+				if ( (int) $i === (int) $index ) {
+					continue;
+				}
+				$others[] = $sl;
+			}
+			$pool = array_slice( $others, (int) $index, 3 );
+			if ( count( $pool ) < 3 ) {
+				$pool = array_merge( $pool, array_slice( $others, 0, 3 - count( $pool ) ) );
+			}
+			foreach ( $pool as $sl ) {
+				if ( empty( $sl['src'] ) ) {
+					continue;
+				}
+				$items[] = [
+					'src'  => $sl['src'],
+					'full' => $sl['src'],
+					'alt'  => $sl['alt'],
+				];
+			}
+		}
+
+		if ( ! $items ) {
+			return '';
+		}
+
+		ob_start();
+		?>
+		<div class="ifg__thumbnails" role="group" aria-label="<?php esc_attr_e( 'More views', 'ifg' ); ?>">
+			<?php foreach ( $items as $t => $item ) : ?>
+				<button
+					type="button"
+					class="ifg__thumb<?php echo 0 === $t ? ' is-active' : ''; ?>"
+					data-full="<?php echo esc_url( $item['full'] ); ?>"
+					aria-pressed="<?php echo 0 === $t ? 'true' : 'false'; ?>">
+					<img src="<?php echo esc_url( $item['src'] ); ?>" alt="<?php echo esc_attr( $item['alt'] ); ?>" loading="lazy" decoding="async" draggable="false">
+					<span class="ifg-sr"><?php echo esc_html( $item['alt'] ); ?></span>
+				</button>
+			<?php endforeach; ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
 	 * The per-slide text blocks of the content view. Used by render() and by the AJAX filter.
 	 */
 	private function render_groups_html( $slides, $s ) {
@@ -2128,6 +2225,11 @@ class Gallery_Widget extends Widget_Base {
 				<?php if ( '' !== trim( (string) $sl['desc'] ) ) : ?>
 					<p class="ifg__desc" dir="auto"><?php echo nl2br( esc_html( $sl['desc'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped, then line breaks added ?></p>
 				<?php endif; ?>
+				<?php
+				if ( 'yes' === ( $s['showThumbs'] ?? 'yes' ) ) {
+					echo $this->render_thumbs_html( $slides, $i ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped inside
+				}
+				?>
 				<?php // An add-to-cart button already is the action: a second link (even a hidden one) only adds clutter and tab stops. ?>
 				<?php if ( ! $atc && ! empty( $sl['url'] ) && ! empty( $s['ctaLabel'] ) ) : ?>
 					<a class="ifg__cta" dir="auto" href="<?php echo esc_url( $sl['url'] ); ?>"<?php echo $sl['new_tab'] ? ' target="_blank"' : ''; ?><?php echo $sl['rel'] ? ' rel="' . esc_attr( $sl['rel'] ) . '"' : ''; ?>><?php echo esc_html( $s['ctaLabel'] ); ?></a>

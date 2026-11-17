@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Infinite Scroll Gallery for Elementor
  * Description:       Endless parallax gallery with GSAP Flip image-to-content transitions, video slides, WooCommerce add-to-cart and category filtering. Based on the Codrops "Infinite Scroll Gallery and Flip Transitions in GSAP" demo (MIT).
- * Version:           1.6.0
+ * Version:           1.7.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Requires Plugins:  elementor
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'IFG_VERSION', '1.6.0' );
+define( 'IFG_VERSION', '1.7.0' );
 define( 'IFG_MIN_ELEMENTOR', '3.5.0' );
 define( 'IFG_URL', plugin_dir_url( __FILE__ ) );
 define( 'IFG_PATH', plugin_dir_path( __FILE__ ) );

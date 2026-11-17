@@ -20,6 +20,36 @@
   box-sizing: border-box;
 }
 
+/* ------------------------------------------------------------------ */
+/* Self-hosted display face (Host Grotesk, SIL OFL)                    */
+/* The original demo used a Typekit face; this is its open-source      */
+/* counterpart, so the split-screen layout needs no external request.  */
+/* "swap": text is readable at once and never waits for the font.      */
+/* ------------------------------------------------------------------ */
+@font-face {
+  font-family: "IFG Display";
+  src: url("../fonts/host-grotesk-latin-300-normal.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IFG Display";
+  src: url("../fonts/host-grotesk-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IFG Display";
+  src: url("../fonts/host-grotesk-latin-500-normal.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 .ifg {
   --ifg-bg: #eaeeed;
   --ifg-caption-color: #9b9b9b;
@@ -44,6 +74,14 @@
   --ifg-z: 1000;
   /* Horizontal unit for the staggered layout: viewport width, or the widget width when supported */
   --ifg-u: 1vw;
+
+  /* Content-view thumbnail strip (see the split-screen block at the end of this file).
+     Declared on the base class so the strip also works in "inside widget" and "full width" modes. */
+  --ifg-thumb-size: 63px;
+  --ifg-thumb-ratio: 0.788;
+  --ifg-thumb-gap: 9.5px;
+  --ifg-thumb-inset: 10.5vw;
+  --ifg-thumb-offset: 2.1vh;
 
   position: relative;
   display: block;
@@ -533,8 +571,8 @@
 /* The class is added by PHP (is_rtl) and by the script as a fallback. */
 /* ------------------------------------------------------------------ */
 .ifg.ifg--rtl .ifg__preview {
-  left: auto;
-  right: 0;
+  inset-inline-start: auto;
+  inset-inline-end: 0;
 }
 
 .ifg.ifg--rtl .ifg__groups {
@@ -1401,309 +1439,326 @@ html.ifg-page-lock body {
   }
 }
 
-
-
-
-اگه لینک براتون باز نشد، کد کامل رو همینجا می‌ذارم. کل متن رو کپی کن و توی فایلی به اسم `ifg-split-screen.css` ذخیره کن، یا مستقیم به آخر `assets/css/ifg.css` اضافه کن.
-
-```css
-/* ============================================================
-   Editorial Split-Screen: product overlay
-   ============================================================ */
+/* ================================================================== */
+/* v1.7 — Editorial split-screen content view                          */
+/*                                                                     */
+/* The reference look (Codrops demo): a full-height photo column on the */
+/* start side, and the text column sitting against the end edge, with   */
+/* the title, description and thumbnail strip right-aligned.            */
+/*                                                                     */
+/* Every value below is a variable so the Elementor controls keep       */
+/* working; the defaults are calibrated against the reference render at */
+/* 1500x720. Nothing here changes the markup or the script.             */
+/* ================================================================== */
 
 .ifg.ifg--page,
 .ifg.ifg--overlay-fixed {
-  --ifg-bg: #f0f0f0;
-  --ifg-overlay-bg: #f0f0f0;
-  --ifg-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --ifg-ink: #111111;
-  --ifg-muted: #6b6b6b;
+  --ifg-bg: #eaeeed;
+  --ifg-overlay-bg: #eaeeed;
+  --ifg-ink: #141414;
+  --ifg-muted: #9b9b9b;
   --ifg-line: #d6d6d6;
-  --ifg-title-font: 'Vazirmatn', Tahoma, 'Segoe UI', sans-serif;
-  background: #f0f0f0;
+  --ifg-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ifg-display-font: "IFG Display", "Host Grotesk", "Vazirmatn", Tahoma, "Segoe UI", sans-serif;
+
+  /* Photo column: 100vh tall, 0.8 aspect in the demo.
+     At 720px of viewport height that is 576px of photo; the reference render is 597px,
+     i.e. 0.829 of the viewport height. `--ifg-split-ratio` keeps the original 0.8 by
+     default and is only bumped on wide screens where the demo used a taller frame. */
+  --ifg-split-ratio: var(--ifg-ratio);
+  /* Where the text column starts: the photo width plus one page padding. */
+  --ifg-split-pad: 22px;
+  --ifg-split-gutter: calc(100vh * var(--ifg-split-ratio) + var(--ifg-split-pad));
+  /* Distance from the end edge to the text column (the demo's 10vw). */
+  --ifg-split-inset: 10.5vw;
+  /* Title / description / thumbnails share this width, against the end edge. */
+  --ifg-title-inset: 7px;
+  --ifg-split-measure: 445px;
 }
 
-.ifg.ifg--page .ifg__content,
-.ifg.ifg--overlay-fixed .ifg__content {
-  background: #f0f0f0;
+/* The text column */
+.ifg.ifg--page .ifg__groups,
+.ifg.ifg--overlay-fixed .ifg__groups,
+.ifg.ifg--rtl .ifg__groups {
+  position: relative;
+  padding-block: 0;
+  padding-inline-start: var(--ifg-split-gutter);
+  padding-inline-end: 0;
+  /* Transparent: the paper colour comes from .ifg__content / .ifg--page underneath, so the
+     photo column painted at z-index 0 is never covered by this full-width box. */
+  background: transparent;
+  scrollbar-width: none;
 }
 
-/* Image: fixed left column, full height */
+/* Photo column */
 .ifg.ifg--page .ifg__preview,
-.ifg.ifg--rtl .ifg__preview {
+.ifg.ifg--overlay-fixed .ifg__preview {
   top: 0;
-  left: 0;
-  right: auto;
-  bottom: auto;
-  width: 45%;
+  inset-inline-start: 0;
+  inset-inline-end: auto;
+  width: auto;
   height: 100vh;
   height: 100dvh;
-  aspect-ratio: auto;
+  aspect-ratio: var(--ifg-split-ratio);
   border-radius: 0;
 }
 
 .ifg.ifg--page .ifg__preview img,
-.ifg.ifg--rtl .ifg__preview img {
+.ifg.ifg--overlay-fixed .ifg__preview img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-/* Text column: starts after the image, breathing room on the right */
-.ifg.ifg--page .ifg__groups,
-.ifg.ifg--rtl .ifg__groups {
-  padding-top: clamp(72px, 10vh, 128px);
-  padding-bottom: 6vh;
-  padding-left: 50%;
-  padding-right: 5vw;
-  background: #f0f0f0;
-}
-
-/* Back button: minimal, uppercase, top-left of the screen */
+/* Back button: small, flat, top of the text column */
 .ifg.ifg--page .ifg__back,
 .ifg.ifg--page .ifg__back:hover,
 .ifg.ifg--page .ifg__back:focus,
-.ifg.ifg--page .ifg__back:active {
-  position: fixed;
-  inset-inline-start: auto;
-  inset-inline-end: auto;
-  top: 28px;
-  left: 28px;
-  z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  align-self: auto;
+.ifg.ifg--page .ifg__back:active,
+.ifg.ifg--overlay-fixed .ifg__back,
+.ifg.ifg--overlay-fixed .ifg__back:hover,
+.ifg.ifg--overlay-fixed .ifg__back:focus,
+.ifg.ifg--overlay-fixed .ifg__back:active {
+  position: static;
+  align-self: flex-start;
   width: auto;
-  margin: 0 !important;
-  padding: 10px 18px !important;
+  margin: 1.55vh 0 0 !important;
+  padding: 6px 0 !important;
   border: 0 !important;
-  border-radius: 999px !important;
-  background: rgba(240, 240, 240, 0.85) !important;
+  border-radius: 0 !important;
+  background: none !important;
   box-shadow: none !important;
+  backdrop-filter: none;
   color: var(--ifg-ink) !important;
-  font-family: var(--ifg-title-font);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-family: var(--ifg-display-font);
+  font-size: 10.6px;
+  font-weight: 400;
+  letter-spacing: 0;
   line-height: 1;
-  text-transform: uppercase;
+  text-transform: none;
   text-decoration: none;
   white-space: nowrap;
   mix-blend-mode: normal;
-  backdrop-filter: blur(8px);
-  transition: transform 0.4s var(--ifg-ease), background-color 0.4s var(--ifg-ease);
+  transition: opacity 0.25s var(--ifg-ease);
 }
 
-.ifg.ifg--page .ifg__back:hover {
-  background: #ffffff !important;
-  text-decoration: none;
-  transform: translateX(-3px);
+.ifg.ifg--page .ifg__back:hover,
+.ifg.ifg--overlay-fixed .ifg__back:hover {
+  background: none !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  opacity: 0.62;
+  transform: none;
 }
 
-.ifg.ifg--page .ifg__back:focus-visible {
-  outline: 1px solid var(--ifg-ink);
+.ifg.ifg--page .ifg__back:focus-visible,
+.ifg.ifg--overlay-fixed .ifg__back:focus-visible {
+  outline: 1px dashed currentColor;
   outline-offset: 4px;
 }
 
-/* Title: very large and bold */
+/* Title: large, light, against the end edge, pushed down into the lower half */
 .ifg.ifg--page .ifg__title,
+.ifg.ifg--overlay-fixed .ifg__title,
 .ifg.ifg--rtl .ifg__title {
-  margin: 0 0 0.45em auto;
-  font-family: var(--ifg-title-font);
-  font-weight: 800;
+  width: fit-content;
+  max-width: 100%;
+  margin: var(--ifg-title-offset, 31.5vh) var(--ifg-title-inset) 0 auto;
+  padding: 0;
+  font-family: var(--ifg-display-font);
+  font-weight: 400;
   font-style: normal;
-  font-size: clamp(40px, 5vw, 80px);
-  line-height: 1.05;
-  letter-spacing: -0.01em;
+  font-size: clamp(32px, calc(100vh * 0.0792), var(--ifg-title-size));
+  line-height: 1;
+  letter-spacing: -0.005em;
   color: var(--ifg-ink);
 }
 
-/* Description: subtle gray */
+.ifg.ifg--page .ifg__count + .ifg__title,
+.ifg.ifg--overlay-fixed .ifg__count + .ifg__title {
+  margin-top: 0.4em;
+}
+
+/* Description: small, muted, in the same measure as the title */
 .ifg.ifg--page .ifg__desc,
+.ifg.ifg--overlay-fixed .ifg__desc,
 .ifg.ifg--rtl .ifg__desc {
-  margin: 0 0 2.5em auto;
-  max-width: 44ch;
-  font-family: var(--ifg-title-font);
-  font-size: clamp(14px, 1.1vw, 16px);
-  font-weight: 300;
-  line-height: 2;
+  width: 100%;
+  max-width: var(--ifg-split-measure);
+  margin: var(--ifg-desc-offset, 1.8vh) var(--ifg-split-inset) 0 auto;
+  padding: 0;
+  font-family: var(--ifg-display-font);
+  font-size: clamp(12px, calc(100vh * 0.02014), var(--ifg-desc-size));
+  font-weight: 400;
+  line-height: 1.41;
+  text-align: right;
   color: var(--ifg-muted);
 }
 
-/* Thumbnail gallery (below the description) */
-.ifg.ifg--page .ifg__thumbnails,
-.ifg.ifg--rtl .ifg__thumbnails {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  width: 100%;
-  max-width: 420px;
-  margin: 0 0 2.5em auto;
+.ifg.ifg--page .ifg__desc,
+.ifg.ifg--overlay-fixed .ifg__desc {
+  text-align: end;
 }
 
-.ifg.ifg--page .ifg__thumb {
-  position: relative;
-  display: block;
+/* Thumbnail strip: four small frames against the end edge, under the description.
+   Flex (not grid) on purpose: every frame has an aspect-ratio and the strip sits in a flex column whose
+   width is driven by the split title, which made a grid collapse into one frame per row. A non-wrapping
+   flex row with explicit frame widths is predictable in every engine. */
+.ifg .ifg__thumbnails {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: var(--ifg-thumb-gap);
+  /* Explicit width: "max-content" resolved to a single frame inside the flex column, which stacked
+     the strip vertically. Four frames + three gaps, like the reference. */
+  width: calc(4 * var(--ifg-thumb-size) + 3 * var(--ifg-thumb-gap));
+  max-width: 100%;
+  margin: var(--ifg-thumb-offset, 2.1vh) var(--ifg-thumb-inset) 0 auto;
   padding: 0;
-  aspect-ratio: 1 / 1;
-  border: 1px solid transparent;
-  background: none;
+}
+
+.ifg .ifg__thumb {
+  position: relative !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  float: none !important;
+  width: var(--ifg-thumb-size) !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: calc(var(--ifg-thumb-size) / var(--ifg-thumb-ratio)) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ifg-img-bg, transparent) !important;
   overflow: hidden;
   cursor: pointer;
-  opacity: 0.5;
-  transition: opacity 0.4s var(--ifg-ease), border-color 0.4s var(--ifg-ease), transform 0.5s var(--ifg-ease);
+  opacity: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: opacity 0.3s var(--ifg-ease);
 }
 
-.ifg.ifg--page .ifg__thumb img {
+.ifg .ifg__thumb img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.6s var(--ifg-ease);
+  transform: none;
+  transition: transform 0.5s var(--ifg-ease), opacity 0.3s var(--ifg-ease);
 }
 
-.ifg.ifg--page .ifg__thumb:hover {
-  opacity: 1;
-  transform: translateY(-3px);
-}
-
-.ifg.ifg--page .ifg__thumb:hover img {
+.ifg .ifg__thumb:hover img {
   transform: scale(1.06);
 }
 
-.ifg.ifg--page .ifg__thumb.is-active,
-.ifg.ifg--page .ifg__thumb[aria-pressed="true"] {
-  opacity: 1;
-  border-color: var(--ifg-ink);
+.ifg .ifg__thumb:not(.is-active) {
+  opacity: 0.55;
 }
 
-.ifg.ifg--page .ifg__thumb:focus-visible {
+.ifg .ifg__thumb:not(.is-active):hover {
+  opacity: 0.85;
+}
+
+.ifg .ifg__thumb.is-active {
+  opacity: 1;
+}
+
+.ifg .ifg__thumb:focus-visible {
   outline: 2px solid var(--ifg-ink);
   outline-offset: 3px;
 }
 
-/* Price + Add to Cart: one elegant row */
-.ifg.ifg--page .ifg__buy,
-.ifg.ifg--rtl .ifg__buy {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1em 2em;
-  width: 100%;
-  max-width: 480px;
-  margin: 0 0 0 auto;
-  padding-top: 2em;
-  border-top: 1px solid var(--ifg-line);
+/* The gallery page itself paints the same paper colour as the content view */
+.ifg.ifg--page {
+  background: var(--ifg-bg);
 }
 
-.ifg.ifg--page .ifg__buy .ifg__price,
-.ifg.ifg--rtl .ifg__buy .ifg__price {
-  margin: 0;
-  width: auto;
-  max-width: none;
-  font-family: var(--ifg-title-font);
-  font-size: clamp(22px, 2vw, 30px);
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--ifg-ink);
+/* Wide screens: the reference render used a slightly taller photo frame (0.829) */
+@media (min-width: 1200px) and (min-height: 660px) {
+  .ifg.ifg--page,
+  .ifg.ifg--overlay-fixed {
+    --ifg-split-ratio: 0.8292;
+  }
 }
 
-.ifg.ifg--page .ifg__buy .ifg__atc,
-.ifg.ifg--rtl .ifg__buy .ifg__atc {
-  min-height: 52px;
-  padding: 0 2.6em !important;
-  border: 1px solid var(--ifg-ink) !important;
-  border-radius: 999px !important;
-  background: var(--ifg-ink) !important;
-  color: #ffffff !important;
-  font-family: var(--ifg-title-font);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  transition: background-color 0.45s var(--ifg-ease), color 0.45s var(--ifg-ease), transform 0.45s var(--ifg-ease), box-shadow 0.45s var(--ifg-ease);
-}
+/* Narrow screens: photo on top, text below, everything full width */
+@media (max-width: 900px) {
+  .ifg.ifg--page,
+  .ifg.ifg--overlay-fixed {
+    --ifg-split-gutter: var(--ifg-split-pad);
+    --ifg-split-inset: var(--ifg-page-padding);
+    --ifg-title-offset: 0px;
+  }
 
-.ifg.ifg--page .ifg__buy .ifg__atc:hover,
-.ifg.ifg--page .ifg__buy .ifg__atc:focus-visible,
-.ifg.ifg--rtl .ifg__buy .ifg__atc:hover,
-.ifg.ifg--rtl .ifg__buy .ifg__atc:focus-visible {
-  background: #ffffff !important;
-  color: var(--ifg-ink) !important;
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(17, 17, 17, 0.12) !important;
-}
-
-.ifg.ifg--page .ifg__buy .ifg__atc[aria-busy="true"] {
-  opacity: 0.6;
-}
-
-/* Mobile: image on top, text below */
-@media (max-width: 767px) {
   .ifg.ifg--page .ifg__preview,
+  .ifg.ifg--overlay-fixed .ifg__preview,
   .ifg.ifg--rtl .ifg__preview {
-    top: 0;
-    left: 0;
-    right: auto;
+    position: absolute;
+    inset-inline-start: 0;
+    inset-inline-end: auto;
     width: 100%;
     height: 46vh;
     height: 46svh;
+    aspect-ratio: auto;
   }
 
   .ifg.ifg--page .ifg__groups,
+  .ifg.ifg--overlay-fixed .ifg__groups,
   .ifg.ifg--rtl .ifg__groups {
-    padding-top: calc(46vh + 32px);
-    padding-bottom: 48px;
-    padding-left: 24px;
-    padding-right: 24px;
+    padding-block: calc(46vh + 28px) 40px;
+    padding-block: calc(46svh + 28px) 40px;
+    padding-inline-end: var(--ifg-page-padding);
   }
 
   .ifg.ifg--page .ifg__back,
-  .ifg.ifg--page .ifg__back:hover,
-  .ifg.ifg--page .ifg__back:focus,
-  .ifg.ifg--page .ifg__back:active {
-    top: 16px;
-    left: 16px;
-    mix-blend-mode: normal;
+  .ifg.ifg--overlay-fixed .ifg__back {
+    position: absolute;
+    inset-inline-start: var(--ifg-page-padding);
+    top: calc(46vh + 14px);
+    top: calc(46svh + 14px);
+    margin: 0 !important;
+    color: var(--ifg-ink) !important;
   }
 
   .ifg.ifg--page .ifg__title,
+  .ifg.ifg--overlay-fixed .ifg__title,
   .ifg.ifg--rtl .ifg__title {
-    margin-top: 0;
-    font-size: clamp(34px, 9vw, 52px);
+    margin: 0 0 0.55em auto;
+    font-size: clamp(30px, 8.4vw, 56px);
   }
 
   .ifg.ifg--page .ifg__desc,
+  .ifg.ifg--overlay-fixed .ifg__desc,
   .ifg.ifg--rtl .ifg__desc {
+    width: auto;
     max-width: none;
+    margin: 0 0 0 auto;
+    font-size: 13px;
   }
 
-  .ifg.ifg--page .ifg__thumbnails,
-  .ifg.ifg--rtl .ifg__thumbnails {
-    max-width: none;
-  }
-
-  .ifg.ifg--page .ifg__buy,
-  .ifg.ifg--rtl .ifg__buy {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    max-width: none;
-  }
-
-  .ifg.ifg--page .ifg__buy .ifg__atc,
-  .ifg.ifg--rtl .ifg__buy .ifg__atc {
-    width: 100%;
+  .ifg .ifg__thumbnails {
+    justify-content: start;
+    margin: 1.2em 0 0;
+    --ifg-thumb-size: 58px;
   }
 }
 
+/* Right-to-left: the photo column moves to the right, the text hugs the left */
+.ifg.ifg--rtl .ifg__preview {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
+
+/* Reduced motion: no hover movement */
 @media (prefers-reduced-motion: reduce) {
-  .ifg.ifg--page .ifg__thumb,
-  .ifg.ifg--page .ifg__thumb img,
-  .ifg.ifg--page .ifg__buy .ifg__atc,
-  .ifg.ifg--page .ifg__back {
+  .ifg .ifg__thumb,
+  .ifg .ifg__thumb img,
+  .ifg.ifg--page .ifg__back,
+  .ifg.ifg--overlay-fixed .ifg__back {
     transition: none !important;
     transform: none !important;
   }
 }
-```

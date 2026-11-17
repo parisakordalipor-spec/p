@@ -596,7 +596,13 @@
       var proof = activeGroup ? activeGroup.querySelector(".ifg__proof") : null;
       self.proof = proof;
       var kids = activeGroup ? Array.prototype.slice.call(activeGroup.children) : [];
-      var targets = [self.back].concat(kids.filter(function (k) { return k !== buy && k !== proof; }));
+      // The thumbnail strip is a flex row of buttons that the visitor clicks; SplitText would wrap it in a
+      // ".ifg-line" div and its frames would stop being flex items (they stacked vertically). Animate it
+      // as one piece, exactly like the price / "Add to cart" block.
+      var thumbs = activeGroup ? activeGroup.querySelector(".ifg__thumbnails") : null;
+      var targets = [self.back].concat(
+        kids.filter(function (k) { return k !== buy && k !== proof && k !== thumbs; })
+      );
       var text = targets.map(function (t) { return t.textContent; }).join(" ");
       var effect = s.textEffect;
       if (effect === "chars" && RTL_SCRIPT.test(text)) effect = "words";
@@ -684,6 +690,14 @@
           s.textDelay + 0.25
         );
       }
+      if (thumbs) {
+        self.tl.fromTo(
+          thumbs,
+          { autoAlpha: 0, y: 20 },
+          { autoAlpha: 1, y: 0, duration: 0.8, ease: "power3.out" },
+          s.textDelay + 0.3
+        );
+      }
     });
   };
 
@@ -757,8 +771,63 @@
       .map(function (g) { return g.querySelector(".ifg__title"); })[0];
     if (activeTitle && activeTitle.id) this.content.setAttribute("aria-labelledby", activeTitle.id);
 
+    this.bindThumbs(index);
+
     var decode = this.previewImg.decode ? this.previewImg.decode() : Promise.resolve();
     return decode.catch(function () {});
+  };
+
+  // Thumbnail strip: swap the big preview to another view of the same item.
+  // The strip lives inside the active group, so it is re-created by every open() and torn down with the content
+  // view; the listener is attached once per open and stored in `this.thumbs` so reset() can drop it.
+  Transition.prototype.bindThumbs = function (index) {
+    var self = this;
+    if (this.thumbs && this.thumbs.off) this.thumbs.off();
+
+    var group = this.groups.filter(function (g) {
+      return Number(g.dataset.index) === index;
+    })[0];
+    var strip = group ? group.querySelector(".ifg__thumbnails") : null;
+    if (!strip) {
+      this.thumbs = null;
+      return;
+    }
+
+    var click = function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest(".ifg__thumb") : null;
+      if (!btn || !strip.contains(btn)) return;
+      var full = btn.getAttribute("data-full");
+      if (!full) return;
+
+      toArr(".ifg__thumb", strip).forEach(function (b) {
+        var on = b === btn;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+
+      // Same cross-fade the open animation ends on: no layout change, so Flip stays untouched.
+      var img = self.previewImg;
+      var swap = function () {
+        img.src = full;
+        gsap.fromTo(img, { autoAlpha: 0.35 }, { autoAlpha: 1, duration: 0.35, ease: "power2.out", overwrite: "auto" });
+      };
+      if (img.getAttribute("src") === full) return;
+      if (img.decode) {
+        var probe = new Image();
+        probe.onload = swap;
+        probe.onerror = swap;
+        probe.src = full;
+      } else {
+        swap();
+      }
+    };
+
+    strip.addEventListener("click", click);
+    this.thumbs = {
+      off: function () {
+        strip.removeEventListener("click", click);
+      }
+    };
   };
 
   Transition.prototype.parts = function () {
@@ -782,8 +851,17 @@
 
     if (this.buy) gsap.set(this.buy, { clearProps: "all" });
     if (this.proof) gsap.set(this.proof, { clearProps: "all" });
+    // The strip was animated as one piece (it is never split), so its props are cleared here too
+    var stripEl = this.groups
+      .filter(function (g) { return g.classList.contains("active"); })
+      .map(function (g) { return g.querySelector(".ifg__thumbnails"); })[0];
+    if (stripEl) gsap.set(stripEl, { clearProps: "all" });
     this.buy = null;
     this.proof = null;
+
+    // Thumbnail strip listener lives on the group that is about to be hidden
+    if (this.thumbs && this.thumbs.off) this.thumbs.off();
+    this.thumbs = null;
 
     gsap.set(this.content, { display: "none" });
     this.content.style.removeProperty("--ifg-fade");
