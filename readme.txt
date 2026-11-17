@@ -3,7 +3,7 @@ Requires at least: 5.8
 Requires PHP: 7.4
 Requires Plugins: elementor
 Tested up to: 6.8
-Stable tag: 1.7.0
+Stable tag: 1.7.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,6 +17,17 @@ morphs it into a full content view with the title, description, price, rating, a
 thumbnail strip.
 
 == Changelog ==
+
+= 1.7.1 =
+* Right-to-left sites no longer collapse the content view: the photo column and the text column were
+  both being pushed to the same side because the geometry used logical (inline) properties. Every
+  geometric rule now has an explicit left/right value plus a mirrored counterpart for RTL.
+* The photo column is a solid panel again: it spans the full window height and is filled with the
+  page colour, so a product photo no longer floats as a bright rectangle over the layout.
+* Product shots on a white or light studio backdrop are detected from their pixels and blended into
+  the panel colour, keeping the product's own colours. Full-bleed editorial photographs are left
+  covering the whole column, exactly like the reference.
+* The price / add-to-cart row no longer overlaps the title in RTL.
 
 = 1.7.0 =
 * Editorial split-screen content view: full-height photo column, title / description / thumbnail strip aligned

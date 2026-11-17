@@ -755,6 +755,7 @@
   };
 
   Transition.prototype.fillContent = function (slide, index) {
+    var self = this;
     var img = slide.querySelector(".ifg__img img");
     // The thumbnail may be a small responsive candidate; the big preview loads the full configured size
     this.previewImg.removeAttribute("srcset");
@@ -774,7 +775,74 @@
     this.bindThumbs(index);
 
     var decode = this.previewImg.decode ? this.previewImg.decode() : Promise.resolve();
-    return decode.catch(function () {});
+    return decode
+      .catch(function () {})
+      .then(function () { self.detectProductShot(); });
+  };
+
+  // Is this picture a product shot on a studio background?
+  // The reference look is a full-bleed photo column: an editorial photograph covers the whole
+  // column, edge to edge. A WooCommerce product photo is the opposite: a small item on a flat white
+  // seamless backdrop, and dropped into that column it leaves a bright rectangle floating on the page.
+  //
+  // The decision is made from pixels, never from the file extension (a WebP can be either).
+  // Two independent signals must agree before the "contain + blend" treatment is applied:
+  //   1. the picture is flat at the edges  -> most border pixels are near-white (or see-through), and
+  //   2. it is NOT edge-to-edge content    -> a full-bleed editorial photo has detail right up to the
+  //                                            frame, so its border is busy, not flat.
+  // Cross-origin images taint the canvas; a failure simply leaves the picture untouched.
+  Transition.prototype.detectProductShot = function () {
+    var img = this.previewImg;
+    if (!img) return;
+    var apply = function (isProduct) {
+      img.classList.toggle("is-ifg-product", !!isProduct);
+      // `.ifg--fullbleed` overrides the no-JS PNG fallback: the script has looked at the pixels and
+      // decided this is a full-bleed editorial photograph, whatever its file extension says.
+      img.classList.toggle("ifg--fullbleed", !isProduct);
+      if (isProduct) img.setAttribute("data-ifg-product", "");
+      else img.removeAttribute("data-ifg-product");
+    };
+
+    if (!img.naturalWidth || !img.naturalHeight) return apply(false);
+
+    var canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 32;
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return apply(false);
+
+    var data;
+    try {
+      ctx.drawImage(img, 0, 0, 32, 32);
+      data = ctx.getImageData(0, 0, 32, 32).data;
+    } catch (e) {
+      return apply(false);
+    }
+
+    // Walk the 1px border of the 32x32 sample: count flat (near white / transparent) pixels.
+    var flat = 0;
+    var total = 0;
+    var step;
+    var sample = function (x, y) {
+      var i = (y * 32 + x) * 4;
+      total++;
+      var a = data[i + 3];
+      if (a < 24) {
+        flat++; // see-through: a cut-out on transparency
+        return;
+      }
+      if (data[i] > 236 && data[i + 1] > 236 && data[i + 2] > 236) flat++;
+    };
+    for (step = 0; step < 32; step++) {
+      sample(step, 0);
+      sample(step, 31);
+      sample(0, step);
+      sample(31, step);
+    }
+
+    // A studio backdrop is flat almost everywhere along the border; an editorial photo is not.
+    // 0.82 keeps a few stray border details from flipping the decision, while a product shot that
+    // happens to touch one edge still qualifies.
+    apply(flat / Math.max(total, 1) >= 0.82);
   };
 
   // Thumbnail strip: swap the big preview to another view of the same item.

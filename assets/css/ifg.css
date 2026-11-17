@@ -1452,6 +1452,10 @@ html.ifg-page-lock body {
   --ifg-split-inset: 10.5vw;
   --ifg-title-inset: 7px;
   --ifg-split-measure: 445px;
+  /* Colour of the photo panel. Matches the reference page colour (#eaeeed) so the product shot
+     and the page read as one continuous block. */
+  --ifg-img-bg: var(--ifg-bg, #eaeeed);
+  --ifg-split-img-pad: 3vh 2.4vw;
   --ifg-title-offset: 31.5vh;
   --ifg-desc-offset: 1.8vh;
   --ifg-thumb-offset: 2.1vh;
@@ -1487,9 +1491,11 @@ html.ifg-page-lock body {
   right: 0;
 }
 
-/* Keep the picture inside its frame whatever the source size / transparency is.
-   Product shots are often transparent PNGs on a white studio background; without this they floated
-   straight over the page. The frame gets a paper-coloured panel so cut-outs still read as a photo. */
+/* The photo column is a SOLID panel in the reference: it starts at the very top edge, ends at the
+   very bottom edge and is filled edge to edge. WooCommerce product shots are usually white-background
+   JPEGs or transparent PNGs, and dumped straight onto the page they read as a stamp floating in the
+   middle of the screen. The panel below gives every image the reference's full-bleed block, and the
+   blend removes the studio white of a product shot so the block stays one flat colour. */
 .ifg.ifg--page .ifg__preview,
 .ifg.ifg--overlay-fixed .ifg__preview {
   background-color: var(--ifg-img-bg, var(--ifg-bg));
@@ -1501,8 +1507,10 @@ html.ifg-page-lock body {
   height: auto;
   min-height: 100vh;
   min-height: 100dvh;
+  isolation: isolate;
 }
 
+/* Photographs: cover the panel completely (the reference is a cropped editorial photo). */
 .ifg.ifg--page .ifg__preview img,
 .ifg.ifg--overlay-fixed .ifg__preview img {
   display: block;
@@ -1512,12 +1520,38 @@ html.ifg-page-lock body {
   object-position: center;
 }
 
-/* Transparent product images look wrong when cropped, so "contain" gets the same panel and centres
-   the picture instead of stretching the cut-out over the whole column. */
-.ifg.ifg--page .ifg__preview img[src$=".png"],
-.ifg.ifg--overlay-fixed .ifg__preview img[src$=".png"] {
+/* Product shots: a white studio background would leave a bright rectangle in the middle of the
+   panel. `darken` keeps every colour of the product untouched while the white backdrop falls away
+   into the panel colour — the resulting block is flat, exactly like the reference. Transparent PNGs
+   are unaffected (they have no white to darken), so the same rule is safe for both. */
+.ifg .ifg__preview img[data-ifg-product],
+.ifg.ifg--page .ifg__preview img.is-ifg-product,
+.ifg.ifg--overlay-fixed .ifg__preview img.is-ifg-product {
   object-fit: contain;
-  padding: 4vh 3vw;
+  padding: var(--ifg-split-img-pad, 3vh 2.4vw);
+  mix-blend-mode: darken;
+}
+
+/* No-JavaScript fallback: the script tags the picture with .is-ifg-product after sampling its
+   border. Without the script (or when the canvas is tainted by a cross-origin image) only a
+   transparent PNG is treated as a cut-out, which is the one format that cannot be a full-bleed
+   photograph on white. Everything else stays full-bleed, like the reference. */
+.ifg.ifg--page .ifg__preview img[src$=".png"],
+.ifg.ifg--overlay-fixed .ifg__preview img[src$=".png"],
+.ifg.ifg--page .ifg__preview img[src*=".png?"],
+.ifg.ifg--overlay-fixed .ifg__preview img[src*=".png?"] {
+  object-fit: contain;
+  padding: var(--ifg-split-img-pad, 3vh 2.4vw);
+  mix-blend-mode: darken;
+}
+
+/* The script is the authority once it has run: it removes the class when the picture turns out to be
+   an editorial full-bleed photo that merely happens to be a PNG. */
+.ifg.ifg--page .ifg__preview img.ifg--fullbleed,
+.ifg.ifg--overlay-fixed .ifg__preview img.ifg--fullbleed {
+  object-fit: cover;
+  padding: 0;
+  mix-blend-mode: normal;
 }
 
 /* ---- Text column ---------------------------------------------------- */
